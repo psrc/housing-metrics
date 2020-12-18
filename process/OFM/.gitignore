@@ -1,3 +1,4 @@
 .vs
-.pyproj
-.sln
+*.pyproj
+*.sln
+*.xlsx
