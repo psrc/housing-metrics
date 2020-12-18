@@ -8,12 +8,13 @@ def download_ofm_apr1_est(dataset, **inter_years):
      Intercensal data requires a starting and ending census year because of how the filename is constructed.
      File will download to the current working directory
     """
+    main_path = 'https://www.ofm.wa.gov/sites/default/files/public/dataresearch/pop/april1'
     if dataset == 'post':
-        dls = 'https://www.ofm.wa.gov/sites/default/files/public/dataresearch/pop/april1/ofm_april1_population_final.xlsx'
+        dls = main_path + '/ofm_april1_population_final.xlsx'
         filename = 'ofm_april1_population_final.xlsx'
     elif dataset == 'inter':
         if ('start' in inter_years) & ('end' in inter_years):
-            dls = 'https://www.ofm.wa.gov/sites/default/files/public/dataresearch/pop/april1/hseries/'+ 'ofm_april1_intercensal_estimates_' + inter_years['start'] + '-' + inter_years['end'] + '.xlsx'
+            dls = main_path + '/hseries/'+ 'ofm_april1_intercensal_estimates_' + inter_years['start'] + '-' + inter_years['end'] + '.xlsx'
             filename = 'ofm_april1_population_intercensal.xlsx'
         else:
             print("You're missing either start or end (or both) keyword arguments.\n")
