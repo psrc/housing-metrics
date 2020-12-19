@@ -108,7 +108,7 @@ table_9_data["id"] = table_9_data.index
 # pivot table to be long for each estimate, moe
 
 table_9_data_long = pd.wide_to_long(table_9_data,['T9_est', 'T9_moe'], i='id',j='measurement_id').reset_index()
-table_9_data_long['measurement_id']=table_9_data_long['measurement_id'].as_type(str)
+table_9_data_long['measurement_id']=table_9_data_long['measurement_id'].astype(str)
 table_9_data_long['table_id']='T9_'
 table_9_data_long['Column Name'] = table_9_data_long[['table_id','measurement_id']].apply(lambda x: ''.join(x), axis=1)
 
