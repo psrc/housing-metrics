@@ -2,4 +2,4 @@
 .Rproj.user
 .RData
 .Ruserdata
-process/PUMS/*-checkpoint.ipynb
+process/PUMS/.ipynb_checkpoints/*
