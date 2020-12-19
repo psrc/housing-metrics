@@ -7,178 +7,13 @@ import requests
 import zipfile
 import sqlalchemy
 
+# This script reads CHAS data from the HUD website, downloads it, unzips it;
+#then it puts it in the Elmer staging database
 
-conn_string = "DRIVER={ODBC Driver 17 for SQL Server}; SERVER=AWS-PROD-SQL\Sockeye; DATABASE=Elmer; trusted_connection=yes"
-sql_conn = pyodbc.connect(conn_string)
-params = urllib.parse.quote_plus(conn_string)
-engine = sqlalchemy.create_engine("mssql+pyodbc:///?odbc_connect=%s" % params)
+# data website is here:https://www.huduser.gov/portal/datasets/cp.html
+# background about data is here: http://aws-linux/mediawiki/index.php/Comprehensive_Housing_Affordability_Strategy_(CHAS)
 
-data_dir = Path('..\\..\\data\\PUMS\\')
-year = 2019
-pums_csv_name_persons = 'psam_p53.csv'
-
-# read data from website to file
-
-
-
-pums_base_url = 'https://www2.census.gov/programs-surveys/acs/data/pums/{}/1-Year/'.format(str(year))
-
-# extract file
-
-
-
-
-# filter data to PSRC tracts
-
-
-# get the columns of data we usually look at
-
-
-# wrangle the data into the shape we'd like to use for Elmer
-
-
-# write to Elmer
-
-# coding: utf-8
-
-
-
-# In[27]:
-
-
-
-
-
-# In[32]:
-
-
-
-pums_doc_url = 'https://www2.census.gov/programs-surveys/acs/tech_docs/pums/data_dict/PUMS_Data_Dictionary_2019.csv'
-
-
-# In[71]:
-
-
-person_zip = 'csv_pwa.zip'
-pums_person_url = pums_base_url + person_zip
-pums_person_file = data_dir / person_zip
-housing_zip = 'csv_hwa.zip'
-pums_housing_url = pums_base_url + housing_zip
-pums_housing_file = data_dir / housing_zip
-
-
-# In[23]:
-
-
-r=requests.get(pums_person_url)
-with open(pums_person_file, 'wb') as f:
-    f.write(r.content)
-with zipfile.ZipFile(pums_person_file, 'r') as zip_ref:
-    zip_ref.extractall(data_dir)  
-
-
-# In[72]:
-
-
-r=requests.get(pums_housing_url)
-with open(pums_housing_file, 'wb') as f:
-    f.write(r.content)
-with zipfile.ZipFile(pums_housing_file, 'r') as zip_ref:
-    zip_ref.extractall(data_dir)   
-
-
-# In[51]:
-
-
-data_dict_cols = ['dd_type','colname','datatype','length', 'col_e','col_f','col_g']
-df_dd = pd.read_csv(pums_doc_url, header=None, names=data_dict_cols)
-
-
-# In[69]:
-
-
-df_colnames = df_dd[df_dd.dd_type =='NAME']
-df_vals = df_dd[df_dd.dd_type == 'VAL']
-
-
-# In[130]:
-
-
-person_csv_path = data_dir / 'psam_p53.csv'
-df_persons = pd.read_csv(person_csv_path, dtype=object)
-
-
-# In[206]:
-
-
-housing_csv_path = data_dir / 'psam_h53.csv'
-df_housing = pd.read_csv(housing_csv_path, dtype=object)
-
-
-# In[154]:
-
-
-def lookup_df(pums_col):
-    df = df_vals[df_vals.colname == pums_col][['colname','datatype','length','col_e','col_f','col_g']]
-    return df
-
-
-# In[242]:
-
-
-def data_type(pums_col):
-    data_type = df_colnames[df_colnames.colname == pums_col].datatype.unique()[0]
-    range_cols = df_vals[df_vals.col_e != df_vals.col_f].colname.unique()
-    if data_type == 'C' and pums_col not in range_cols:
-        returned_data_type = 'char_lookup'
-    else:
-        returned_data_type = data_type
-    return returned_data_type
-
-
-# In[184]:
-
-
-def decode_char_column(pums_df, col_name):
-    df_temp = lookup_df(col_name)
-    #df_temp = df_housing.merge(df_access, how='left', left_on='ACCESS', right_on='col_e')
-    pums_df[col_name] = pums_df.merge(df_temp, how='left', left_on=col_name, right_on='col_e')[['col_g']]
-    return pums_df
-
-
-# In[226]:
-
-
-def decode_columns(pums_df):
-    working_df = pums_df.copy(deep=True)
-    for col in working_df.columns:
-        col_type = data_type(col)
-        if col_type == 'char_lookup':
-            working_df_df = decode_char_column(working_df, col)  
-    return working_df
-
-
-# In[245]:
-
-
-df_housing_decoded = decode_columns(df_housing)
-
-
-# In[247]:
-
-
-df_persons_decoded = decode_columns(df_persons)
-
-
-# In[ ]:
-
-
-# MOREMORE: Need to send the two decoded df's to Elmer
-
-
-# In[272]:
-
-
+# functions to help write to the staging database
 def castable(df, col_name, dtype):
     try:
         df[col_name].astype(dtype)
@@ -187,40 +22,21 @@ def castable(df, col_name, dtype):
     except:
         return False
 
-
-# In[282]:
-
-
-def get_stage_table_col_types(pums_df):
+def get_stage_table_col_types(df):
     col_types = {}
-    for c in pums_df.columns:
-        if castable(pums_df, c, np.int16):
+    for c in df.columns:
+        if castable(df, c, np.int16):
             dtype = np.int16
-        elif castable(pums_df, c, np.int32):
+        elif castable(df, c, np.int32):
             dtype = np.int32
-        elif castable(pums_df, c, np.int64):
+        elif castable(df, c, np.int64):
             dtype = np.int64
-        elif castable(pums_df, c, np.float64 ):
+        elif castable(df, c, np.float64 ):
             dtype = np.float64
         else:
             dtype = object
         col_types[c] = dtype
     return col_types  
-
-
-# In[283]:
-
-
-df_persons_coltypes = get_stage_table_col_types(df_persons_decoded)
-
-
-# In[286]:
-
-
-df = pd.DataFrame({'a': [1,2,3],'b':[10,11,12]})
-
-
-# In[295]:
 
 
 def recast_coltypes(df):
@@ -229,23 +45,73 @@ def recast_coltypes(df):
         df[col] = df[col].astype(new_dtypes[col])
 
 
-# In[301]:
-
-
-recast_coltypes(df_persons_decoded)
-df_persons_decoded.dtypes
-
-
-# In[302]:
-
-
 def df_to_staging(df, table_name):
     recast_coltypes(df)
     df.to_sql(name=table_name, schema='stg', con=engine)
 
+# url to read from
+base_url = 'https://www.huduser.gov/portal/datasets/cp/'
+data_file_name = '2013thru2017-140-csv.zip'
+url_for_file = base_url+data_file_name
 
-# In[ ]:
+#zip file to write to
+data_dir = 'C:\\Users\\SChildress\\Documents\\GitHub\\housing-metrics\\data\\'
+file_name_local = data_dir+data_file_name
+output_path_zip = data_dir+'2013thru2017-140-csv\\140\\'
+
+# extracted file names for table and dictionary
+table_9_file_name = 'Table9.csv'
+table_9_path_name = output_path_zip+table_9_file_name
+data_dict_name = 'CHAS data dictionary 13-17.xlsx'
+data_dict_path_name = output_path_zip+data_dict_name
+
+# SQL Server info
+conn_string = "DRIVER={ODBC Driver 17 for SQL Server}; SERVER=AWS-PROD-SQL\Sockeye; DATABASE=Elmer; trusted_connection=yes"
+sql_conn = pyodbc.connect(conn_string)
+params = urllib.parse.quote_plus(conn_string)
+engine = sqlalchemy.create_engine("mssql+pyodbc:///?odbc_connect=%s" % params)
+
+# read data from website to file, extract
+r=requests.get(url_for_file)
+with open(file_name_local, 'wb') as f:
+    f.write(r.content)
+with zipfile.ZipFile(file_name_local, 'r') as zip_ref:
+    zip_ref.extractall(data_dir)  
+
+#We use tract-level data for CHAS Table 9 to produce Cost Burden by Tenure (Owner, Renter) 
+#and Race/Ethnicity, along with an in-house crosswalk table between census tracts and county subareas 
+#“Cost burden” is defined as monthly housing costs as a percentage of gross income; t
+##here are 4 cost burden categories: 1) less than or equal to 30%, 2) greater than 30% but less than or equal to 50%, 3) greater than 50%, and 4) cost burden not computed (no or negative income) 
+#Race/ethnicity categories include: 1) White alone, non-Hispanic, 2) Black or African-American alone, non-Hispanic, 3) Asian alone, non-Hispanic, 4) American Indian or Alaska Native alone, non-Hispanic, 5) Pacific Islander alone, non-Hispanic, 6) Hispanic, any race, and 7) Other (including multiple races, non-Hispanic).
+#Basically, the first step involves pulling the relevant data fields from CHAS Table 9 
+#for each census tract in the region.
+
+#  read in table 9 info Cost Burden by Tenure and Race, also read data dictionary
+
+data_dict_df = pd.read_excel(data_dict_path_name, sheet_name='Table 9')
+data_dict_df['Column Name'] = data_dict_df['Column Name'].str.replace('est','')
 
 
-df_to_staging(df_persons_decoded, 'psam_p53_2019')
+df_to_staging(data_dict_df, 'chas_data_dict')
+
+table_9_data = pd.read_csv(table_9_path_name, encoding = 'ISO-8859-1')
+# filter data to PSRC tracts
+# parse column D "name" to find which rows are for our region
+counties_region = 'King County, Washington|Kitsap County, Washington|Pierce County, Washington|Snohomish County, Washington'
+region_table_9 = table_9_data[table_9_data['name'].str.contains(counties_region)]
+
+# truncate geo_id to remove the part before US so it can join on our usual tract data
+
+table_9_data['GEOID_short'] = table_9_data['geoid'].str.split('US').str[1]
+table_9_data["id"] = table_9_data.index
+
+# pivot table to be long for each estimate, moe
+
+table_9_data_long = pd.wide_to_long(table_9_data,['T9_est', 'T9_moe'], i='id',j='measurement_id').reset_index()
+table_9_data_long['measurement_id']=table_9_data_long['measurement_id'].as_type(str)
+table_9_data_long['table_id']='T9_'
+table_9_data_long['Column Name'] = table_9_data_long[['table_id','measurement_id']].apply(lambda x: ''.join(x), axis=1)
+
+
+df_to_staging(table_9_data_long, 'chas_tbl_9')
 
