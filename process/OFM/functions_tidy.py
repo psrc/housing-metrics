@@ -3,6 +3,10 @@ from pandas.api.types import is_string_dtype
 import numpy as np
 
 def tidy_ofm_apr(dataset, tabname):
+    """
+    This function will clean and transform a single sheet either post-censal or intercensal April 1 data from OFM. 
+    Intercensal data has a different format than the postcensal (e.g. additional Place Code columns, column names, Jurisdiction string format) 
+    """
     tabname = str.lower(tabname)
     tabname = str.replace(tabname, " ", '_')
     if tabname == 'population':
