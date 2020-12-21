@@ -2,3 +2,5 @@
 *.pyproj
 *.sln
 *.xlsx
+*.TMP
+__pycache__/

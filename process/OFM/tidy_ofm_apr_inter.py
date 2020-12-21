@@ -19,4 +19,4 @@ for tabname in list(all.keys()):
 
 # join all dataframes into one
 join_dfs = partial(pd.merge, on = ['county', 'jurisdiction', 'estimate_year'])
-df = reduce(join_dfs, df_all)
+df_inter = reduce(join_dfs, df_all)
