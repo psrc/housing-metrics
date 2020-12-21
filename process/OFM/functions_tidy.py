@@ -11,9 +11,15 @@ def tidy_ofm_apr(dataset, tabname):
     tabname = str.replace(tabname, " ", '_')
     if tabname == 'population':
         tabname = 'total_population'
+    if tabname == 'gq_population':
+        tabname = 'group_quarters_population'
+    if tabname == 'occupied_housing':
+        tabname = 'occupied_housing_units'
+    if tabname == 'total_housing':
+        tabname = 'housing_units'
 
     # Intercensal specific munging
-    if dataset.columns.contains('County Name') | dataset.columns.contains('City Name'):
+    if {'County Name', 'City Name'}.issubset(dataset.columns):
         dataset = dataset.rename(columns = {'County Name': 'County'})
         dataset['Jurisdiction'] = dataset['Jurisdiction'].str.replace('city', '')
         dataset['Jurisdiction'] = dataset['Jurisdiction'].str.replace('town','')
