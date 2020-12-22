@@ -12,9 +12,9 @@ engine = sqlalchemy.create_engine("mssql+pyodbc:///?odbc_connect=%s" % params)
 # intercensal data
 exec(open('tidy_ofm_apr_inter.py').read())
 sql_table_name = "ofm_apr_intercensal"
-df_inter.to_sql(name=sql_table_name, schema=sql_schema, con=engine)
+df_inter.to_sql(name=sql_table_name, schema=sql_schema, con=engine, if_exists='replace')
 
 # post-censal data
 exec(open('tidy_ofm_apr_post.py').read())
 sql_table_name = "ofm_apr_postcensal"
-df_post.to_sql(name=sql_table_name, schema=sql_schema, con=engine)
+df_post.to_sql(name=sql_table_name, schema=sql_schema, con=engine, if_exists='replace')
