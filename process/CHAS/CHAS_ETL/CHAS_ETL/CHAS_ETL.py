@@ -49,6 +49,9 @@ def df_to_staging(df, table_name):
     recast_coltypes(df)
     df.to_sql(name=table_name, schema='stg', con=engine)
 
+
+############### Paths and Database parameters
+
 # url to read from
 base_url = 'https://www.huduser.gov/portal/datasets/cp/'
 data_file_name = '2013thru2017-140-csv.zip'
@@ -71,6 +74,8 @@ sql_conn = pyodbc.connect(conn_string)
 params = urllib.parse.quote_plus(conn_string)
 engine = sqlalchemy.create_engine("mssql+pyodbc:///?odbc_connect=%s" % params)
 
+########## Go get the data and unzip
+
 # read data from website to file, extract
 r=requests.get(url_for_file)
 with open(file_name_local, 'wb') as f:
@@ -88,6 +93,9 @@ with zipfile.ZipFile(file_name_local, 'r') as zip_ref:
 
 #  read in table 9 info Cost Burden by Tenure and Race, also read data dictionary
 
+################ Read the data from excel/csv, wrangle it into a good shape, put it in elmer
+
+
 data_dict_df = pd.read_excel(data_dict_path_name, sheet_name='Table 9')
 data_dict_df['Column Name'] = data_dict_df['Column Name'].str.replace('est','')
 
@@ -102,12 +110,12 @@ region_table_9 = table_9_data[table_9_data['name'].str.contains(counties_region)
 
 # truncate geo_id to remove the part before US so it can join on our usual tract data
 
-table_9_data['GEOID_short'] = table_9_data['geoid'].str.split('US').str[1]
-table_9_data["id"] = table_9_data.index
+region_table_9['GEOID_short'] = region_table_9['geoid'].str.split('US').str[1]
+region_table_9["id"] = region_table_9.index
 
 # pivot table to be long for each estimate, moe
 
-table_9_data_long = pd.wide_to_long(table_9_data,['T9_est', 'T9_moe'], i='id',j='measurement_id').reset_index()
+table_9_data_long = pd.wide_to_long(region_table_9,['T9_est', 'T9_moe'], i='id',j='measurement_id').reset_index()
 table_9_data_long['measurement_id']=table_9_data_long['measurement_id'].astype(str)
 table_9_data_long['table_id']='T9_'
 table_9_data_long['Column Name'] = table_9_data_long[['table_id','measurement_id']].apply(lambda x: ''.join(x), axis=1)
