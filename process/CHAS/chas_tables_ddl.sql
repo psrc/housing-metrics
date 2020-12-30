@@ -5,6 +5,7 @@ Created on: 12/22/2020
 */
 
 -- scratch pad
+/*
 	select top 100 *
 	from stg.chas_data_dict
 
@@ -19,8 +20,12 @@ Created on: 12/22/2020
 
 	select count(*)
 	from stg.chas_tbl_9 c
-
+*/
 -- DDL statements
+	-- first, get rid of the fact table with all its foreign key constraints
+	drop table if exists chas.estimate_facts
+	go
+
 	drop table if exists chas.variable_dim
 	go
 	create table chas.variable_dim(
@@ -28,7 +33,7 @@ Created on: 12/22/2020
 		created_at datetime2 not null default getdate(),
 		updated_at datetime2 not null default getdate(),
 		chas_table_number int,
-		column_name varchar(20),
+		variable_name varchar(20),
 		line_type varchar(50),
 		tenure varchar(50),
 		race_ethnicity varchar(100),
