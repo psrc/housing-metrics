@@ -41,4 +41,4 @@ if {'moble_homes_and_specials'}.issubset(df.columns):
 df.columns.name = None
 
 cols = ['county', 'jurisdiction', 'estimate_year', 'total_housing_units', 'one_unit_housing_units', 'two_or_more_unit_housing_units', 'mobile_homes_and_specials']
-df = df[cols]
+df_post_housing = df[cols]
