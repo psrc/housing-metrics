@@ -28,7 +28,6 @@ ALTER TABLE [ofm].[jurisdiction_dim] ENABLE TRIGGER [trigger_ofm__jurisdiction_d
 GO
 
 
-
 drop table if exists ofm.april_1_estimate_facts
 go
 CREATE TABLE [ofm].[april_1_estimate_facts](
@@ -165,7 +164,7 @@ insert into ofm.publication_dim (publication_year, publication_name, publication
 values (2020, '2020 April 1 Postcensal','postcensal')
 */
 
-create procedure ofm.merge_april_1_estimate_facts_postcensal
+create procedure ofm.merge_april_1_estimate_facts_postcensal_population
 as 
 with cte as (
 	select stg.estimate_year, 
@@ -184,6 +183,13 @@ on (
 	and source.jurisdiction_dim_id = target.jurisdiction_dim_id
 	and source.estimate_year = target.estimate_year
 )
+when matched 
+		and (
+			source.total_population <> target.total_population
+			or target.total_population is null
+		)
+	then update 
+		set target.total_population = source.total_population
 when not matched then insert (
 	estimate_year,
 	publication_dim_id,
@@ -196,32 +202,44 @@ when not matched then insert (
 	source.total_population
 );
 
-select ef.estimate_year,
-	jd.county_name,
-	sum(ef.housing_units) as housing_units
-from ofm.april_1_estimate_facts ef
-	join ofm.publication_dim pd on ef.publication_dim_id = pd.publication_dim_id
-	join ofm.jurisdiction_dim jd on ef.jurisdiction_dim_id = jd.jurisdiction_dim_id
-where pd.publication_name = '2020 April 1 Intercensal'
-group by ef.estimate_year,
-	jd.county_name
-order by ef.estimate_year,
-	jd.county_name
+create procedure ofm.merge_april_1_estimate_facts_postcensal_housing
+as
+with cte as (
+	select 
+		s.estimate_year,
+		pd.publication_dim_id,
+		jd.jurisdiction_dim_id,
+		s.total_housing_units as housing_units
+	from stg.ofm_apr_postcensal_housing s
+		join ofm.publication_dim pd on pd.publication_name = '2020 April 1 Postcensal'
+		join ofm.jurisdiction_dim jd on s.jurisdiction = jd.jurisdiction_name
+			and s.county = jd.county_name
+)
+merge ofm.april_1_estimate_facts as target
+using cte as source
+on (
+	source.publication_dim_id = target.publication_dim_id
+	and source.jurisdiction_dim_id = target.jurisdiction_dim_id
+	and source.estimate_year = target.estimate_year
+)
+when matched 
+		and (
+			source.housing_units <> target.housing_units
+			or target.housing_units is null
+		)
+	then update 
+		set target.housing_units = source.housing_units
+when not matched then insert (
+	estimate_year,
+	publication_dim_id,
+	jurisdiction_dim_id,
+	housing_units
+) values (
+	source.estimate_year,
+	source.publication_dim_id,
+	source.jurisdiction_dim_id,
+	source.housing_units
+);
 
-select ef.estimate_year,
-	gd.county_name,
-	sum(ef.housing_units) as housing_units
-from ofm.estimate_facts ef
-	join ofm.publication_dim pd on ef.publication_dim_id = pd.publication_dim_id
-	join census.geography_dim gd on ef.geography_dim_id = gd.geography_dim_id
-where pd.publication_name = '2020 Vintage Data'
-group by ef.estimate_year,
-	gd.county_name
-order by ef.estimate_year,
-	gd.county_name
+exec ofm.merge_april_1_estimate_facts_postcensal_housing
 
-select  distinct estimate_year
-from stg.ofm_apr_intercensal
-
-select  top 5 *
-from stg.ofm_apr_postcensal
