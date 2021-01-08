@@ -40,32 +40,37 @@ def get_stage_table_col_types(df):
 
 
 def recast_coltypes(df):
+    print('recasting column types...')
     new_dtypes = get_stage_table_col_types(df)
     for col in new_dtypes.keys():
         df[col] = df[col].astype(new_dtypes[col])
+    print('finished recasting column types.')
 
 
 def df_to_staging(df, table_name):
+    print('writing {} to stg schema...'.format(table_name))
     recast_coltypes(df)
-    df.to_sql(name=table_name, schema='stg', con=engine)
+    df.to_sql(name=table_name, schema='stg', con=engine, if_exists='replace')
+    print('finished writing {} to stg schema'.format(table_name))
 
 
 ############### Paths and Database parameters
 
 # url to read from
 base_url = 'https://www.huduser.gov/portal/datasets/cp/'
-data_file_name = '2013thru2017-140-csv.zip'
+data_file_name = '2012thru2016-140-csv.zip'
 url_for_file = base_url+data_file_name
 
 #zip file to write to
-data_dir = 'C:\\Users\\SChildress\\Documents\\GitHub\\housing-metrics\\data\\'
+# data_dir = 'C:\\Users\\SChildress\\Documents\\GitHub\\housing-metrics\\data\\'
+data_dir = '..\\..\\..\\..\\data\\'
 file_name_local = data_dir+data_file_name
-output_path_zip = data_dir+'2013thru2017-140-csv\\140\\'
+output_path_zip = data_dir+'2012thru2016-140-csv\\2012thru2016-140-csv\\140\\'
 
 # extracted file names for table and dictionary
 table_9_file_name = 'Table9.csv'
 table_9_path_name = output_path_zip+table_9_file_name
-data_dict_name = 'CHAS data dictionary 13-17.xlsx'
+data_dict_name = 'CHAS data dictionary 12-16.xlsx'
 data_dict_path_name = output_path_zip+data_dict_name
 
 # SQL Server info
@@ -121,5 +126,5 @@ table_9_data_long['table_id']='T9_'
 table_9_data_long['Column Name'] = table_9_data_long[['table_id','measurement_id']].apply(lambda x: ''.join(x), axis=1)
 
 
-df_to_staging(table_9_data_long, 'chas_tbl_9')
+df_to_staging(table_9_data_long, 'chas_tbl_9_2016')
 
