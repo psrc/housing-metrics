@@ -21,7 +21,7 @@ class pums_pipeline:
       self.pums_csv_name_housing = 'psam_h53.csv'
       self.adjust_factor_cols = ['ADJHSG', 'ADJINC']
       pums_base_url = 'https://www2.census.gov/programs-surveys/acs/data/pums/{}/1-Year/'.format(str(year))
-      self.pums_doc_url = 'https://www2.census.gov/programs-surveys/acs/tech_docs/pums/data_dict/PUMS_Data_Dictionary_2019.csv'
+      self.pums_doc_url = 'https://www2.census.gov/programs-surveys/acs/tech_docs/pums/data_dict/PUMS_Data_Dictionary_{}.csv'.format(str(year))
       person_zip = 'csv_pwa.zip'
       self.pums_person_url = pums_base_url + person_zip
       self.pums_person_file = self.data_dir / person_zip
