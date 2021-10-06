@@ -4,7 +4,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>e4987f0e-e1d0-4abd-aae9-d6d3ef6b0999</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>CHAS_ETL.py</StartupFile>
+    <StartupFile>CHAS_API.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
@@ -21,6 +21,7 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="CHAS_API.py" />
     <Compile Include="CHAS_ETL.py" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
