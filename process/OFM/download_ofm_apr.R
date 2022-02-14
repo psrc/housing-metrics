@@ -1,6 +1,11 @@
 library(here)
 
 download_ofm_apr1_est <- function(dataset, ...) {
+
+   # This function will download either post-censal or intercensal April 1 data from OFM. 
+   # Intercensal data requires a starting and ending census year because of how the filename is constructed.
+   # File will download to the current working directory
+
   root_url <-  'https://ofm.wa.gov/sites/default/files/public/dataresearch/pop/april1'
   data_dir <-  'data'
   kwargs <- list(...)
@@ -26,7 +31,6 @@ download_ofm_apr1_est <- function(dataset, ...) {
       dest <-  here(data_dir, filename)
     } else {
       stop("You're missing either start or end (or both) keyword arguments.\n")
-
     }
   } else {
     stop("Use either 'post' or 'inter' for dataset argument\n")
@@ -34,4 +38,6 @@ download_ofm_apr1_est <- function(dataset, ...) {
   download.file(dls, dest, mode = 'wb')
 }
 
-download_ofm_apr1_est('inter', start = '2000', end = '2010')
+# download_ofm_apr1_est('inter', start = '2000', end = '2010')
+# download_ofm_apr1_est('post', posttype = 'population')
+# download_ofm_apr1_est('post', posttype = 'housing')
