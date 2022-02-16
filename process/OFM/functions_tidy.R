@@ -1,9 +1,17 @@
 tidy_ofm_apr <- function(dataset, tabname) {
 
-  # This function will clean and transform a single sheet either post-censal or intercensal April 1 data from OFM. 
+  # This function will clean and transform a single sheet either post-censal (population or housing) or intercensal April 1 data from OFM. 
   # Intercensal data has a different format than the postcensal (e.g. additional Place Code columns, column names, Jurisdiction string format) 
 
   d <- setDT(dataset)
+  
+  if('County.Name' %in% colnames(d) && 'City.Name' %in% colnames(d)) {
+    dtype <- 'intercensal'
+  } else if(length(str_subset(colnames(d), 'Two.or.More.Unit.Housing.Units')) > 1) {
+    dtype <- 'housing'
+  } else {
+    dtype <- 'post'
+  } 
 
   tabname <-  str_to_lower(tabname)
   tabname <-  str_replace_all(tabname, " ", '_')
@@ -23,7 +31,7 @@ tidy_ofm_apr <- function(dataset, tabname) {
     rm.cols <- c('City.Name', str_subset(colnames(d), '.*Code$'))
     d <- d[, !..rm.cols]
   }
-  
+
   # filter for region
   counties <- c('King', 'Kitsap', 'Pierce', 'Snohomish')
   reg <- d[County %in% counties, ]
@@ -33,13 +41,35 @@ tidy_ofm_apr <- function(dataset, tabname) {
 
   # pivot longer
   reg.pvt <- melt(reg, id.vars = c('County', 'Jurisdiction'), variable.name = 'desc', value.name = tabname)
-  reg.pvt[, estimate_year := str_extract(desc, '^\\d+')][, desc := NULL]
+  reg.pvt[, estimate_year := str_extract(desc, '^\\d+')]
+
+  if(dtype == 'housing') {
+    reg.pvt[, housing_type := str_extract(desc, '((?<=of\\.).*)')]
+    reg.pvt[, housing_type := str_replace_all(housing_type, '\\.', '_')]
+    reg.pvt[, housing_type := str_replace_all(housing_type, '\\W$', '')]
+    reg.pvt[, housing_type := str_replace_all(housing_type, 'Moble', 'Mobile')]
+    reg.pvt[, housing_type := str_to_lower(housing_type)]
+  } 
   
-  # rename and reorder
+  # munge
+  reg.pvt[, desc := NULL]
   colnames(reg.pvt) <- str_to_lower(colnames(reg.pvt))
-  cols <- c("county", "jurisdiction", "estimate_year", tabname)
-  setcolorder(reg.pvt, cols)
   
+  if(dtype != 'housing') {
+    # reorder
+    cols <- c("county", "jurisdiction", "estimate_year", tabname)
+    setcolorder(reg.pvt, cols)
+    
+  }
+
   # convert to numeric cols
   reg.pvt[, (tabname) := as.numeric(get(eval(tabname)))]
+  
+  if(dtype == 'housing') {
+    reg.pvt <- dcast(reg.pvt, county + jurisdiction + estimate_year ~ housing_type, value.var = 'housing_units')
+    cols <-  c('county', 'jurisdiction', 'estimate_year', 'total_housing_units', 'one_unit_housing_units', 'two_or_more_unit_housing_units', 'mobile_homes_and_specials')
+    setcolorder(reg.pvt, cols)
+  }
+  
+  return(reg.pvt)
 }

@@ -1,13 +1,10 @@
 # This script will tidy and compile downloaded intercensal OFM April 1 data
-# library(openxlsx)
-# library(purrr)
 
 source(here::here('process', 'OFM', 'config.R'))
 source(here::here('process', 'OFM', 'functions_tidy.R'))
 
 data_dir <- 'data'
 filename <- filename_inter
-# filename <- 'ofm_april1_intercensal_estimates_2000-2010.xlsx'
 
 tabs <- getSheetNames(here(data_dir, filename))
 tabs <- tabs[which(tabs != 'Readme')]
