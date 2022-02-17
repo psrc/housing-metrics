@@ -37,7 +37,3 @@ download_ofm_apr1_est <- function(dataset, ...) {
   }
   download.file(dls, dest, mode = 'wb')
 }
-
-# download_ofm_apr1_est('inter', start = '2000', end = '2010')
-# download_ofm_apr1_est('post', posttype = 'population')
-# download_ofm_apr1_est('post', posttype = 'housing')

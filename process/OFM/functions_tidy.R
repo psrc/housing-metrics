@@ -16,10 +16,10 @@ tidy_ofm_apr <- function(dataset, tabname) {
   tabname <-  str_to_lower(tabname)
   tabname <-  str_replace_all(tabname, " ", '_')
   
-  if(tabname == 'population') 'total_population'
-  if(tabname == 'gq_population') 'group_quarters_population'
-  if(tabname == 'occupied_housing') 'occupied_housing_units'
-  if(tabname == 'total_housing') 'housing_units'
+  if(tabname == 'population') tabname <- 'total_population'
+  if(tabname == 'gq_population') tabname <- 'group_quarters_population'
+  if(tabname == 'occupied_housing') tabname <- 'occupied_housing_units'
+  if(tabname == 'total_housing') tabname <- 'housing_units'
 
   # intercensal specific munging
   if('County.Name' %in% colnames(d) && 'City.Name' %in% colnames(d)) {
