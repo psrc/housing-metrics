@@ -3,3 +3,4 @@
 .RData
 .Ruserdata
 process/PUMS/.ipynb_checkpoints/*
+process/OFM/*.html
