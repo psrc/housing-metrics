@@ -26,42 +26,54 @@ Adjust `sql.query` below where appropriate. To view different vintages of OFM Ap
 ```{r}
 pub.dim <- dbGetQuery(elmer_connection, SQL('SELECT * FROM ofm.publication_dim'))
 datatable(pub.dim,
-          options = list(columnDefs = list(list(visible = FALSE, targets = c(2, 4))))
+          options = list(columnDefs = list(list(visible = FALSE, targets = c(2,3, 4))))
           )
 ```
 
-## Postcensal Data
+
 
 ```{r}
 sql.query <- 'SELECT b.county_name, b.jurisdiction_name, a.estimate_year, a.housing_units, a.total_population, a.publication_dim_id, c.publication_name, c.publication_type
 FROM ofm.april_1_estimate_facts AS a 
     LEFT JOIN ofm.jurisdiction_dim AS b ON a.jurisdiction_dim_id = b.jurisdiction_dim_id
     LEFT JOIN ofm.publication_dim AS c ON a.publication_dim_id = c.publication_dim_id
-WHERE a.publication_dim_id = 6;'
+WHERE a.publication_dim_id = 7;'
 
 # read in a queried table
 df <- dbGetQuery(elmer_connection, SQL(sql.query))
+
+setDT(df)
+setorder(df, county_name, jurisdiction_name, estimate_year)
+
+df.plot <- df[, lapply(.SD, sum), .SDcols = c('total_population', 'housing_units'), by = c('county_name', 'estimate_year', 'publication_name')]
+
+df.plot.l <- melt(df.plot, measure.vars = c('total_population', 'housing_units'))
+setorder(df.plot.l, county_name, variable,  estimate_year)
+
+df.plot.l[, prev_val := shift(value, type = 'lag'), by = c('county_name', 'variable')]
+df.plot.l[, diff := value-prev_val]
+df.plot.l[, diff_share := diff/prev_val]
+df.plot.l[, variable := str_to_title(str_replace_all(variable, "_", " "))]
+
+brk <- seq(min(df.plot.l$estimate_year), max(df.plot.l$estimate_year))
+
+if(length(brk) > 5) {
+  brk <- brk[seq(1,length(brk),5)]
+}
+
+brk.end.yrs <- brk[2:length(brk)] 
+brk.range <- paste0(brk.end.yrs-1, '-', brk.end.yrs)
+```
+
+## Postcensal Data
+
+```{r}
 datatable(df,
           caption = 'April 1 Postcensal by Jurisdiction',
           options = list(columnDefs = list(list(visible = FALSE, targets = c(8)))))
 ```
 
 ```{r}
-setDT(df)
-
-df.plot <- df[, lapply(.SD, sum), .SDcols = c('total_population', 'housing_units'), by = c('county_name', 'estimate_year', 'publication_name')]
-
-df.plot.l <- melt(df.plot, measure.vars = c('total_population', 'housing_units'))
-df.plot.l[, prev_val := shift(value, type = 'lag'), by = c('county_name', 'variable')]
-df.plot.l[, diff := value-prev_val]
-df.plot.l[, diff_share := diff/prev_val]
-df.plot.l[, variable := str_to_title(str_replace_all(variable, "_", " "))]
-
-brk <- seq(min(df.plot.l$estimate_year), max(df.plot.l$estimate_year), by = 5)
-if(length(brk) > 1) {
-  brk.end.yrs <- brk[2:length(brk)] 
-  brk.range <- paste0(brk.end.yrs-1, '-', brk.end.yrs)
-} 
 
 datatable(df.plot.l,
           caption = 'April 1 Postcensal by County')
@@ -85,10 +97,6 @@ ggplot(df.plot.l) +
 ```
 
 ```{r}
-
-```
-
-```{r}
 ggplot(df.plot.l) +
   geom_col(aes(estimate_year, diff)) +
   facet_grid(cols = vars(county_name), rows = vars(variable), scales = 'free') +
@@ -103,6 +111,7 @@ ggplot(df.plot.l) +
                                    hjust = 1, 
                                    vjust = 1))
 ```
+
 ```{r}
 ggplot(df.plot.l) +
   geom_col(aes(estimate_year, diff_share)) +
