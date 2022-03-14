@@ -22,11 +22,12 @@ elmer_connection <- dbConnect(odbc::odbc(),
 ```
 
 ## Publications
-Adjust `sql.query` below where appropriate. To view different vintages of OFM April 1 Postcensal data, check the `ofm.publication_dim` for the specific `publication_dim_id`:
+To view different vintages of OFM April 1 Postcensal data, check the `ofm.publication_dim` for the specific `publication_dim_id` and adjust `sql.query` in the next code chunk.
+
 ```{r}
 pub.dim <- dbGetQuery(elmer_connection, SQL('SELECT * FROM ofm.publication_dim'))
 datatable(pub.dim,
-          options = list(columnDefs = list(list(visible = FALSE, targets = c(2,3, 4))))
+          options = list(columnDefs = list(list(visible = FALSE, targets = c(2,3,4))))
           )
 ```
 
@@ -37,7 +38,7 @@ sql.query <- 'SELECT b.county_name, b.jurisdiction_name, a.estimate_year, a.hous
 FROM ofm.april_1_estimate_facts AS a 
     LEFT JOIN ofm.jurisdiction_dim AS b ON a.jurisdiction_dim_id = b.jurisdiction_dim_id
     LEFT JOIN ofm.publication_dim AS c ON a.publication_dim_id = c.publication_dim_id
-WHERE a.publication_dim_id = 7;'
+WHERE a.publication_dim_id = 4;'
 
 # read in a queried table
 df <- dbGetQuery(elmer_connection, SQL(sql.query))
@@ -59,7 +60,7 @@ brk <- seq(min(df.plot.l$estimate_year), max(df.plot.l$estimate_year))
 
 if(length(brk) > 5) {
   brk <- brk[seq(1,length(brk),5)]
-}
+} 
 
 brk.end.yrs <- brk[2:length(brk)] 
 brk.range <- paste0(brk.end.yrs-1, '-', brk.end.yrs)
