@@ -13,27 +13,42 @@ download_ofm_apr1_est <- function(dataset, ...) {
   if(dataset == 'post') {
     if('posttype' %in% names(kwargs)){
       if(kwargs['posttype'] == 'population') {
+        
         filename <- 'ofm_april1_population_final.xlsx'
         dls <-  file.path(root_url, filename)
         dest <-  here(data_dir, filename)
+        
       } else if (kwargs['posttype'] == 'housing') {
+        
         filename <- 'ofm_april1_housing.xlsx'
         dls <-  file.path(root_url, filename)
         dest <-  here(data_dir, filename)
+        
       } else {
         stop("You're missing a posttype keyword argument. Indicate whether posttype is population or housing.\n")
       }
     }
+    download.file(dls, dest, mode = 'wb')
+    
   } else if(dataset == 'inter') {
     if(('start' %in% names(kwargs)) && ('end' %in% names(kwargs))) {
+      
+      # variations of intercensal filenames
       filename <- paste0('ofm_april1_intercensal_estimates_', kwargs['start'], '-', kwargs['end'], '.xlsx')
-      dls <-  file.path(root_url, 'hseries', filename)
-      dest <-  here(data_dir, filename)
+      filenames <- c(filename, str_replace_all(filename, '-', '_'))
+      
+      for (file in filenames) {
+        dls <-  file.path(root_url, 'hseries', file)
+        dest <-  here(data_dir, file)
+        tryCatch(download.file(dls, dest, mode = "wb", quiet = FALSE),
+                 error = function(e) print(paste(file, 'did not download, trying next filename')))
+      }
+      
     } else {
       stop("You're missing either start or end (or both) keyword arguments.\n")
     }
+    
   } else {
     stop("Use either 'post' or 'inter' for dataset argument\n")
   }
-  download.file(dls, dest, mode = 'wb')
 }
