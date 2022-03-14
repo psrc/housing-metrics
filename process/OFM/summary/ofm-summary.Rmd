@@ -66,18 +66,18 @@ brk.end.yrs <- brk[2:length(brk)]
 brk.range <- paste0(brk.end.yrs-1, '-', brk.end.yrs)
 ```
 
-## Postcensal Data
+## Data
 
 ```{r}
 datatable(df,
-          caption = 'April 1 Postcensal by Jurisdiction',
+          caption = paste(unique(df$publication_name), 'by Jurisdiction'),
           options = list(columnDefs = list(list(visible = FALSE, targets = c(8)))))
 ```
 
 ```{r}
 
 datatable(df.plot.l,
-          caption = 'April 1 Postcensal by County')
+          caption = paste(unique(df.plot.l$publication_name),'by County'))
 ```
 
 ```{r}
