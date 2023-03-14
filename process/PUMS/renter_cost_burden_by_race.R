@@ -10,7 +10,8 @@ library(dplyr)
 library(srvyr)
 
 x <- get_psrc_pums(5,2021,"h",c("PRACE","TEN","GRPIP","HINCP"))
-x %<>% filter(TEN=="Rented") %>%
+df <- x[[7]]
+df <- df %>% filter(TEN=="Rented") %>%
        mutate(
           income_bin=factor(case_when(HINCP < 25000 ~ "Under $25,000",
                                       HINCP < 35000 ~ "$25,000-$34,999",
@@ -33,4 +34,4 @@ x %<>% filter(TEN=="Rented") %>%
                                 levels=c("Greater than 50 percent",
                                          "Between 30 and 50 percent",
                                          "Less than 30 percent", "Else")))
-inc_rb_rgn <- psrc_pums_count(x, group_vars=c("PRACE","income_bin","rent_burden"))
+inc_rb_rgn <- psrc_pums_count(df, group_vars=c("PRACE","income_bin","rent_burden"))
