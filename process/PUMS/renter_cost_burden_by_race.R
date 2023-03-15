@@ -10,7 +10,7 @@ library(dplyr)
 library(srvyr)
 
 rcb_raw <- get_psrc_pums(5,2021,"h",c("PRACE","TEN","GRPIP","HINCP"))
-rcb <- rcb_raw[[7]]
+rcb <- rcb_raw
 rcb <- rcb %>% filter(TEN=="Rented") %>%
        mutate(
           income_bin=factor(case_when(HINCP < 25000 ~ "Under $25,000",
