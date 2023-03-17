@@ -40,8 +40,26 @@ rcb <- rcb %>% filter(TEN=="Rented") %>%
                                          "Between 30 and 50 percent",
                                          "Less than 30 percent", "No Rent Charged")))
 
-# Create output table
+# Create full table
 inc_rb_rgn <- psrc_pums_count(rcb, group_vars=c("PRACE","income_bin","rent_burden"))
+
+# SUMMARIZE BY RACE/ETHNICITY -----------------------------
+# Summarize
+rcb_by_re <- inc_rb_rgn %>% group_by(PRACE,rent_burden) %>% summarize(renters = sum(count))
+rcb_by_re <- rcb_by_re %>% pivot_wider(names_from = rent_burden, values_from = renters)
+
+# Rename and rearrange columns
+rcb_by_re <- rcb_by_re %>% rename("No Rent Paid" = "NA")
+rcb_by_re <- rcb_by_re[, c(1,2,3,4,6,5)]
+
+# SUMMARIZE BY COST BURDEN -----------------------------
+# Summarize
+rcb_by_cat <- inc_rb_rgn %>% group_by(income_bin,rent_burden) %>% summarize(renters = sum(count))
+rcb_by_cat <- rcb_by_cat %>% pivot_wider(names_from = rent_burden, values_from = renters)
+
+# Rename and rearrange columns
+rcb_by_cat <- rcb_by_cat %>% rename("No Rent Paid" = "NA")
+rcb_by_cat <- rcb_by_cat[, c(1,2,3,4,6,5)]
 
 # Exporting table
 
@@ -51,4 +69,3 @@ work_book <- createWorkbook()
 addWorksheet(work_book, sheetName = "RenterCostBurdenbyRE")
 writeData(work_book, "RenterCostBurdenbyRE", inc_rb_rgn)
 saveWorkbook(work_book, file = "Renter Cost Burden by RE\renter_cost_burden_by_RE.xlsx", overwrite = TRUE)
-
