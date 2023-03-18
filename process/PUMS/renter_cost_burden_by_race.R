@@ -1,13 +1,14 @@
 # TITLE: Renter Cost Burden by Race
 # GEOGRAPHIES: PSRC Region
 # DATA SOURCE: ACS PUMS
-# DATE MODIFIED: 3.14.2023
+# DATE MODIFIED: 3.17.2023
 # AUTHOR: Eric Clute
 
 library(magrittr)
 library(psrccensus)
 library(dplyr)
 library(srvyr)
+library(tidyr)
 
 # Pull PUMS data
 setwd("C:/Users/eclute/Downloads")
@@ -41,31 +42,61 @@ rcb <- rcb %>% filter(TEN=="Rented") %>%
                                          "Less than 30 percent", "No Rent Charged")))
 
 # Create full table
-inc_rb_rgn <- psrc_pums_count(rcb, group_vars=c("PRACE","income_bin","rent_burden"))
+rcb <- psrc_pums_count(rcb, group_vars=c("PRACE","income_bin","rent_burden"))
+
+# Modify Race/Ethnicity Categories
+# This section I will replace race categories with shorter versions we've used in the past
 
 # SUMMARIZE BY RACE/ETHNICITY -----------------------------
 # Summarize
-rcb_by_re <- inc_rb_rgn %>% group_by(PRACE,rent_burden) %>% summarize(renters = sum(count))
-rcb_by_re <- rcb_by_re %>% pivot_wider(names_from = rent_burden, values_from = renters)
+rcb_re <- rcb %>% group_by(PRACE,rent_burden) %>% summarize(renters = sum(count))
+rcb_re <- rcb_re %>% pivot_wider(names_from = rent_burden, values_from = renters)
 
-# Rename and rearrange columns
-rcb_by_re <- rcb_by_re %>% rename("No Rent Paid" = "NA")
-rcb_by_re <- rcb_by_re[, c(1,2,3,4,6,5)]
+# Rename, rearrange, and recalculate columns
+rcb_re <- rcb_re %>% rename("No rent paid" = "NA")
+rcb_re <- rcb_re %>% mutate(`No rent paid` = na_if(`No rent paid`, 0))
+rcb_re$Total <- rowSums(rcb_re[,c("Greater than 50 percent", "Between 30 and 50 percent", "Less than 30 percent", "No rent paid")], na.rm=TRUE)
+rcb_re <- rcb_re[, c(1,2,3,4,6,5)]
+
+# Create percentage output
+rcb_re_perc <- rcb_re
+rcb_re_perc$`Severely cost burdened` <- rcb_re_perc$`Greater than 50 percent`/rcb_re_perc$Total
+rcb_re_perc$`Cost burdened` <- rcb_re_perc$`Between 30 and 50 percent`/rcb_re_perc$Total
+rcb_re_perc$`Not cost burdened` <- rcb_re_perc$`Less than 30 percent`/rcb_re_perc$Total
+rcb_re_perc$`No income or no rent paid` <- rcb_re_perc$`No rent paid`/rcb_re_perc$Total
+
+rcb_re_perc <- rcb_re_perc[, c(1,7,8,9,10)]
 
 # SUMMARIZE BY COST BURDEN -----------------------------
 # Summarize
-rcb_by_cat <- inc_rb_rgn %>% group_by(income_bin,rent_burden) %>% summarize(renters = sum(count))
-rcb_by_cat <- rcb_by_cat %>% pivot_wider(names_from = rent_burden, values_from = renters)
+rcb_cat <- rcb %>% group_by(income_bin,rent_burden) %>% summarize(renters = sum(count))
+rcb_cat <- rcb_cat %>% pivot_wider(names_from = rent_burden, values_from = renters)
 
 # Rename and rearrange columns
-rcb_by_cat <- rcb_by_cat %>% rename("No Rent Paid" = "NA")
-rcb_by_cat <- rcb_by_cat[, c(1,2,3,4,6,5)]
+rcb_cat <- rcb_cat %>% rename("No rent paid" = "NA")
+rcb_cat$Total <- rowSums(rcb_cat[,c("Greater than 50 percent", "Between 30 and 50 percent", "Less than 30 percent", "No rent paid")], na.rm=TRUE)
+rcb_cat <- rcb_cat[, c(1,2,3,4,6,5)]
 
-# Exporting table
+# Create percentage output
+rcb_cat_perc <- rcb_cat
+rcb_cat_perc$`Severely cost burdened` <- rcb_cat_perc$`Greater than 50 percent`/rcb_cat_perc$Total
+rcb_cat_perc$`Cost burdened` <- rcb_cat_perc$`Between 30 and 50 percent`/rcb_cat_perc$Total
+rcb_cat_perc$`Not cost burdened` <- rcb_cat_perc$`Less than 30 percent`/rcb_cat_perc$Total
+rcb_cat_perc$`No income or no rent paid` <- rcb_cat_perc$`No rent paid`/rcb_cat_perc$Total
+
+rcb_cat_perc <- rcb_cat_perc[, c(1,7,8,9,10)]
+
+# Exporting tables
 
 library(openxlsx)
 
 work_book <- createWorkbook()
-addWorksheet(work_book, sheetName = "RenterCostBurdenbyRE")
-writeData(work_book, "RenterCostBurdenbyRE", inc_rb_rgn)
-saveWorkbook(work_book, file = "Renter Cost Burden by RE\renter_cost_burden_by_RE.xlsx", overwrite = TRUE)
+addWorksheet(work_book, sheetName = "CostBurdenbyRE")
+writeData(work_book, "CostBurdenbyRE", rcb_re)
+addWorksheet(work_book, sheetName = "CostBurdenbyRE_perc")
+writeData(work_book, "CostBurdenbyRE_perc", rcb_re_perc)
+addWorksheet(work_book, sheetName = "CostBurdenbyCategory")
+writeData(work_book, "CostBurdenbyCategory", rcb_cat)
+addWorksheet(work_book, sheetName = "CostBurdenbyCat_perc")
+writeData(work_book, "CostBurdenbyCat_perc", rcb_cat_perc)
+saveWorkbook(work_book, file = "Renter Cost Burden by RE/renter_cost_burden.xlsx", overwrite = TRUE)
