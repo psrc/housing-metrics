@@ -1,7 +1,7 @@
 # TITLE: Renter Cost Burden by Race
 # GEOGRAPHIES: PSRC Region
 # DATA SOURCE: ACS PUMS
-# DATE MODIFIED: 3.17.2023
+# DATE MODIFIED: 3.20.2023
 # AUTHOR: Eric Clute
 
 library(magrittr)
@@ -45,9 +45,15 @@ rcb <- rcb %>% filter(TEN=="Rented") %>%
 rcb <- psrc_pums_count(rcb, group_vars=c("PRACE","income_bin","rent_burden"))
 
 # Modify Race/Ethnicity Categories
-# This section I will replace race categories with shorter versions we've used in the past
+rcb$PRACE <- gsub("American Indian or Alaskan Native Alone", "American Indian/Alaskan Native", rcb$PRACE, ignore.case = TRUE)
+rcb$PRACE <- gsub("Asian alone", "Asian", rcb$PRACE, ignore.case = TRUE)
+rcb$PRACE <- gsub("Black or African American alone", "Black", rcb$PRACE, ignore.case = TRUE)
+rcb$PRACE <- gsub("Hispanic or Latino", "Hispanic/Latinx", rcb$PRACE, ignore.case = TRUE)
+rcb$PRACE <- gsub("Native Hawaiian and Other Pacific Islander alone", "Native Hawaiian/Other Pacific Islander", rcb$PRACE, ignore.case = TRUE)
+rcb$PRACE <- gsub("Some Other Race alone", "Other Race", rcb$PRACE, ignore.case = TRUE)
+rcb$PRACE <- gsub("White alone", "White", rcb$PRACE, ignore.case = TRUE)
 
-# SUMMARIZE BY RACE/ETHNICITY -----------------------------
+# ----------------------------- SUMMARIZE BY RACE/ETHNICITY -----------------------------
 # Summarize
 rcb_re <- rcb %>% group_by(PRACE,rent_burden) %>% summarize(renters = sum(count))
 rcb_re <- rcb_re %>% pivot_wider(names_from = rent_burden, values_from = renters)
@@ -58,6 +64,13 @@ rcb_re <- rcb_re %>% mutate(`No rent paid` = na_if(`No rent paid`, 0))
 rcb_re$Total <- rowSums(rcb_re[,c("Greater than 50 percent", "Between 30 and 50 percent", "Less than 30 percent", "No rent paid")], na.rm=TRUE)
 rcb_re <- rcb_re[, c(1,2,3,4,6,5)]
 
+# Sum variables for Other Race and Two or More Races - Becoming "Other Race/Two or More Races"
+temp <- subset(rcb_re, rcb_re$PRACE == "Other Race" | rcb_re$PRACE == "Two or More Races")
+
+
+# Add combined row to original data frame
+rcb_re <- rbind(rcb_re, temp)
+
 # Create percentage output
 rcb_re_perc <- rcb_re
 rcb_re_perc$`Severely cost burdened` <- rcb_re_perc$`Greater than 50 percent`/rcb_re_perc$Total
@@ -67,7 +80,7 @@ rcb_re_perc$`No income or no rent paid` <- rcb_re_perc$`No rent paid`/rcb_re_per
 
 rcb_re_perc <- rcb_re_perc[, c(1,7,8,9,10)]
 
-# SUMMARIZE BY COST BURDEN -----------------------------
+# ----------------------------- SUMMARIZE BY COST BURDEN -----------------------------
 # Summarize
 rcb_cat <- rcb %>% group_by(income_bin,rent_burden) %>% summarize(renters = sum(count))
 rcb_cat <- rcb_cat %>% pivot_wider(names_from = rent_burden, values_from = renters)
