@@ -16,7 +16,7 @@ rcb_raw <- get_psrc_pums(5,2021,"h",c("PRACE","TEN","GRPIP","HINCP"))
 setwd("J:/Projects/V2050/Housing/Monitoring/2023Update")
 rcb <- rcb_raw
 
-# Filter to only renters, create income/rent burden groupings
+# Filter to only renters, create income/rent burden groupings, rename race/ethnicity categories, combine Some other Race & Two or More Races
 rcb <- rcb %>% filter(TEN=="Rented") %>%
        mutate(
           income_bin=factor(case_when(HINCP < 25000 ~ "Under $25,000",
@@ -36,57 +36,31 @@ rcb <- rcb %>% filter(TEN=="Rented") %>%
           rent_burden=factor(case_when(GRPIP < 30 ~"Less than 30 percent",
                                        between(GRPIP,30,50) ~ "Between 30 and 50 percent",
                                        GRPIP > 50 ~ "Greater than 50 percent",
-                                       !is.na(GRPIP) ~ "No Rent Paid"),
+                                       !is.na(GRPIP) ~ "No rent paid"),
                               levels=c("Greater than 50 percent",
                                        "Between 30 and 50 percent",
                                        "Less than 30 percent",
-                                       "No Rent Paid")),
-          race=factor(case_when(PRACE == "American Indian or Alaskan Native Alone" ~ "American Indian/Alaskan Native",
-                                PRACE == "Asian alone" ~ "Asian",
-                                PRACE == "Black or African American alone" ~ "Black",
-                                PRACE == "Hispanic or Latino" ~ "Hispanic/Latinx",
-                                PRACE == "Native Hawaiian and Other Pacific Islander alone" ~ "Native Hawaiian/Other Pacific Islander",
-                                PRACE == "White alone" ~ "White",
-                                grepl("^(Some Other Race|Two or More Races)", PRACE) ~ "Other Race/Two or More Races"),
-                                !is.na(PRACE ~ NA),
-                      levels=c("American Indian/Alaskan Native",
-                               "Asian",                                     
-                               "Black",
-                               "Hispanic/Latinx",
-                               "Native Hawaiian/Other Pacific Islander",
-                               "White",
-                               "Other Race/Two or More Races",
-                               NA)))
+                                       "No rent paid")),
+          PRACE=factor(
+            case_when(grepl("Other Race|Two or More Races", PRACE) ~"Other or Multiple Races",
+                      grepl("^Black ", PRACE) ~"Black",
+                      grepl("^Hispanic ", PRACE) ~"Hispanic/Latinx",
+                      grepl(" or ", PRACE) ~ stringr::str_replace(PRACE, " or ","/"),
+                      grepl(" and ", PRACE) ~ stringr::str_replace(PRACE, " and ","/"),
+                      grepl(" alone", PRACE) ~ stringr::str_replace(PRACE, " alone",""))))
 
 # Create full table
 rcb <- psrc_pums_count(rcb, group_vars=c("PRACE","income_bin","rent_burden"))
-
-# Modify Race/Ethnicity Categories
-rcb$PRACE <- gsub("American Indian or Alaskan Native Alone", "American Indian/Alaskan Native", rcb$PRACE, ignore.case = TRUE)
-rcb$PRACE <- gsub("Asian alone", "Asian", rcb$PRACE, ignore.case = TRUE)
-rcb$PRACE <- gsub("Black or African American alone", "Black", rcb$PRACE, ignore.case = TRUE)
-rcb$PRACE <- gsub("Hispanic or Latino", "Hispanic/Latinx", rcb$PRACE, ignore.case = TRUE)
-rcb$PRACE <- gsub("Native Hawaiian and Other Pacific Islander alone", "Native Hawaiian/Other Pacific Islander", rcb$PRACE, ignore.case = TRUE)
-rcb$PRACE <- gsub("Some Other Race alone", "Other Race", rcb$PRACE, ignore.case = TRUE)
-rcb$PRACE <- gsub("White alone", "White", rcb$PRACE, ignore.case = TRUE)
 
 # ----------------------------- SUMMARIZE BY RACE/ETHNICITY -----------------------------
 # Summarize
 rcb_re <- rcb %>% group_by(PRACE,rent_burden) %>% summarize(renters = sum(count))
 rcb_re <- rcb_re %>% pivot_wider(names_from = rent_burden, values_from = renters)
 
-# Rename, rearrange, and recalculate columns
+# Rename NA column to "No rent paid", recalculate total column, and rearrange columns
 rcb_re <- rcb_re %>% rename("No rent paid" = "NA")
-rcb_re <- rcb_re %>% mutate(`No rent paid` = na_if(`No rent paid`, 0))
 rcb_re$Total <- rowSums(rcb_re[,c("Greater than 50 percent", "Between 30 and 50 percent", "Less than 30 percent", "No rent paid")], na.rm=TRUE)
 rcb_re <- rcb_re[, c(1,2,3,4,6,5)]
-
-# Sum variables for Other Race and Two or More Races - Becoming "Other Race/Two or More Races"
-temp <- subset(rcb_re, rcb_re$PRACE == "Other Race" | rcb_re$PRACE == "Two or More Races")
-
-
-# Add combined row to original data frame
-rcb_re <- rbind(rcb_re, temp)
 
 # Create percentage output
 rcb_re_perc <- rcb_re
@@ -102,7 +76,7 @@ rcb_re_perc <- rcb_re_perc[, c(1,7,8,9,10)]
 rcb_cat <- rcb %>% group_by(income_bin,rent_burden) %>% summarize(renters = sum(count))
 rcb_cat <- rcb_cat %>% pivot_wider(names_from = rent_burden, values_from = renters)
 
-# Rename and rearrange columns
+# Rename NA column to "No rent paid", recalculate total column, and rearrange columns
 rcb_cat <- rcb_cat %>% rename("No rent paid" = "NA")
 rcb_cat$Total <- rowSums(rcb_cat[,c("Greater than 50 percent", "Between 30 and 50 percent", "Less than 30 percent", "No rent paid")], na.rm=TRUE)
 rcb_cat <- rcb_cat[, c(1,2,3,4,6,5)]
@@ -129,4 +103,4 @@ addWorksheet(work_book, sheetName = "CostBurdenbyCategory")
 writeData(work_book, "CostBurdenbyCategory", rcb_cat)
 addWorksheet(work_book, sheetName = "CostBurdenbyCat_perc")
 writeData(work_book, "CostBurdenbyCat_perc", rcb_cat_perc)
-saveWorkbook(work_book, file = "Renter Cost Burden by RE/renter_cost_burden.xlsx", overwrite = TRUE)
+saveWorkbook(work_book, file = "Renter Cost Burden by RE - Burden Category/renter_cost_burden_20215YRPUMS.xlsx", overwrite = TRUE)
