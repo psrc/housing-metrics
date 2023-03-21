@@ -1,7 +1,7 @@
 # TITLE: Renter Cost Burden by Race
 # GEOGRAPHIES: PSRC Region
-# DATA SOURCE: ACS PUMS
-# DATE MODIFIED: 3.20.2023
+# DATA SOURCE: ACS PUMS 5YR
+# DATE MODIFIED: 3.21.2023
 # AUTHOR: Eric Clute
 
 library(magrittr)
@@ -33,13 +33,30 @@ rcb <- rcb %>% filter(TEN=="Rented") %>%
                                      "$75,000-$99,999",
                                      "$100,000 or more",
                                      "Else / Prefer not to answer")),
-            rent_burden=factor(case_when(GRPIP < 30 ~"Less than 30 percent",
-                                         between(GRPIP,30,50) ~ "Between 30 and 50 percent",
-                                         GRPIP > 50 ~ "Greater than 50 percent",
-                                         !is.na(GRPIP) ~ "No Rent Charged"),
-                                levels=c("Greater than 50 percent",
-                                         "Between 30 and 50 percent",
-                                         "Less than 30 percent", "No Rent Charged")))
+          rent_burden=factor(case_when(GRPIP < 30 ~"Less than 30 percent",
+                                       between(GRPIP,30,50) ~ "Between 30 and 50 percent",
+                                       GRPIP > 50 ~ "Greater than 50 percent",
+                                       !is.na(GRPIP) ~ "No Rent Paid"),
+                              levels=c("Greater than 50 percent",
+                                       "Between 30 and 50 percent",
+                                       "Less than 30 percent",
+                                       "No Rent Paid")),
+          race=factor(case_when(PRACE == "American Indian or Alaskan Native Alone" ~ "American Indian/Alaskan Native",
+                                PRACE == "Asian alone" ~ "Asian",
+                                PRACE == "Black or African American alone" ~ "Black",
+                                PRACE == "Hispanic or Latino" ~ "Hispanic/Latinx",
+                                PRACE == "Native Hawaiian and Other Pacific Islander alone" ~ "Native Hawaiian/Other Pacific Islander",
+                                PRACE == "White alone" ~ "White",
+                                grepl("^(Some Other Race|Two or More Races)", PRACE) ~ "Other Race/Two or More Races"),
+                                !is.na(PRACE ~ NA),
+                      levels=c("American Indian/Alaskan Native",
+                               "Asian",                                     
+                               "Black",
+                               "Hispanic/Latinx",
+                               "Native Hawaiian/Other Pacific Islander",
+                               "White",
+                               "Other Race/Two or More Races",
+                               NA)))
 
 # Create full table
 rcb <- psrc_pums_count(rcb, group_vars=c("PRACE","income_bin","rent_burden"))
