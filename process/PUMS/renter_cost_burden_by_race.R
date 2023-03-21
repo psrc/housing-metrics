@@ -71,7 +71,7 @@ rcb_re_perc$`No income or no rent paid` <- rcb_re_perc$`No rent paid`/rcb_re_per
 
 rcb_re_perc <- rcb_re_perc[, c(1,7,8,9,10)]
 
-# ----------------------------- SUMMARIZE BY COST BURDEN -----------------------------
+# ----------------------------- SUMMARIZE BY COST BURDEN CATEGORY -----------------------------
 # Summarize
 rcb_cat <- rcb %>% group_by(income_bin,rent_burden) %>% summarize(renters = sum(count))
 rcb_cat <- rcb_cat %>% pivot_wider(names_from = rent_burden, values_from = renters)
