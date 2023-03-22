@@ -40,7 +40,6 @@ pums_new_vars <- pums20_5year %>%
          tenure=factor(case_when(TEN=="Owned free and clear"|TEN=="Owned with mortgage or loan (include home equity loans)" ~ "owner", !is.na(TEN) ~"renter"),
                        levels=c("owner", "renter")))
 
-
 #-------------- Group by R/E Category, Income, Tenure - keep all tenure and rbind region data --------------
 tenurebyre_region <- psrc_pums_count(pums_new_vars, group_vars = c("income_bin","PRACE","tenure"))
 tenurebyre <- psrc_pums_count(pums_new_vars, group_vars = c("COUNTY","income_bin","PRACE","tenure")) %>%
