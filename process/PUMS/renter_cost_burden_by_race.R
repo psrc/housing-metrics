@@ -49,18 +49,26 @@ rcb <- rcb %>% filter(TEN=="Rented") %>%
                       grepl(" and ", PRACE) ~ stringr::str_replace(PRACE, " and ","/"),
                       grepl(" alone", PRACE) ~ stringr::str_replace(PRACE, " alone",""))))
 
-# Create full table
-rcb <- psrc_pums_count(rcb, group_vars=c("PRACE","income_bin","rent_burden"))
-
 # ----------------------------- SUMMARIZE BY RACE/ETHNICITY -----------------------------
 # Summarize
-rcb_re <- rcb %>% group_by(PRACE,rent_burden) %>% summarize(renters = sum(count))
-rcb_re <- rcb_re %>% pivot_wider(names_from = rent_burden, values_from = renters)
+rcb_re <- psrc_pums_count(rcb, group_vars = c("rent_burden","PRACE"))
+rcb_re <- rcb_re[, c(3,4,5,6)]
+rcb_re <- rcb_re %>% pivot_wider(names_from = rent_burden, values_from = c(count, count_moe))
+#
+# Rename columns, recalculate total, and rearrange columns
+rcb_re <- rcb_re %>% rename("No rent paid" = "count_NA")
+rcb_re <- rcb_re %>% rename("Greater than 50 percent" = "count_Greater than 50 percent")
+rcb_re <- rcb_re %>% rename("Between 30 and 50 percent" = "count_Between 30 and 50 percent")
+rcb_re <- rcb_re %>% rename("Less than 30 percent" = "count_Less than 30 percent")
+rcb_re <- rcb_re %>% rename("Total" = "count_Total")
+rcb_re <- rcb_re %>% rename("Greater than 50 percent moe" = "count_moe_Greater than 50 percent")
+rcb_re <- rcb_re %>% rename("Between 30 and 50 percent moe" = "count_moe_Between 30 and 50 percent")
+rcb_re <- rcb_re %>% rename("Less than 30 percent moe" = "count_moe_Less than 30 percent")
+rcb_re <- rcb_re %>% rename("Total moe" = "count_moe_Total")
+rcb_re <- rcb_re %>% rename("No rent paid moe" = "count_moe_NA")
 
-# Rename NA column to "No rent paid", recalculate total column, and rearrange columns
-rcb_re <- rcb_re %>% rename("No rent paid" = "NA")
 rcb_re$Total <- rowSums(rcb_re[,c("Greater than 50 percent", "Between 30 and 50 percent", "Less than 30 percent", "No rent paid")], na.rm=TRUE)
-rcb_re <- rcb_re[, c(1,2,3,4,6,5)]
+rcb_re <- rcb_re[, c(1,2,3,4,6,5,7,8,9,11,10)]
 
 # Create percentage output
 rcb_re_perc <- rcb_re
@@ -70,27 +78,28 @@ rcb_re_perc$`Not cost burdened` <- rcb_re_perc$`Less than 30 percent`/rcb_re_per
 rcb_re_perc$`No income or no rent paid` <- rcb_re_perc$`No rent paid`/rcb_re_perc$Total
 
 rcb_re_perc <- rcb_re_perc[, c(1,7,8,9,10)]
+# 
+# # ----------------------------- SUMMARIZE BY COST BURDEN CATEGORY -----------------------------
+# # Summarize
+# rcb_cat <- rcb %>% group_by(income_bin,rent_burden) %>% summarize(renters = sum(count))
+# rcb_cat <- rcb_cat %>% pivot_wider(names_from = rent_burden, values_from = renters)
+# 
+# # Rename NA column to "No rent paid", recalculate total column, and rearrange columns
+# rcb_cat <- rcb_cat %>% rename("No rent paid" = "NA")
+# rcb_cat$Total <- rowSums(rcb_cat[,c("Greater than 50 percent", "Between 30 and 50 percent", "Less than 30 percent", "No rent paid")], na.rm=TRUE)
+# rcb_cat <- rcb_cat[, c(1,2,3,4,6,5)]
+# 
+# # Create percentage output
+# rcb_cat_perc <- rcb_cat
+# rcb_cat_perc$`Severely cost burdened` <- rcb_cat_perc$`Greater than 50 percent`/rcb_cat_perc$Total
+# rcb_cat_perc$`Cost burdened` <- rcb_cat_perc$`Between 30 and 50 percent`/rcb_cat_perc$Total
+# rcb_cat_perc$`Not cost burdened` <- rcb_cat_perc$`Less than 30 percent`/rcb_cat_perc$Total
+# rcb_cat_perc$`No income or no rent paid` <- rcb_cat_perc$`No rent paid`/rcb_cat_perc$Total
+# 
+# rcb_cat_perc <- rcb_cat_perc[, c(1,7,8,9,10)]
 
-# ----------------------------- SUMMARIZE BY COST BURDEN CATEGORY -----------------------------
-# Summarize
-rcb_cat <- rcb %>% group_by(income_bin,rent_burden) %>% summarize(renters = sum(count))
-rcb_cat <- rcb_cat %>% pivot_wider(names_from = rent_burden, values_from = renters)
 
-# Rename NA column to "No rent paid", recalculate total column, and rearrange columns
-rcb_cat <- rcb_cat %>% rename("No rent paid" = "NA")
-rcb_cat$Total <- rowSums(rcb_cat[,c("Greater than 50 percent", "Between 30 and 50 percent", "Less than 30 percent", "No rent paid")], na.rm=TRUE)
-rcb_cat <- rcb_cat[, c(1,2,3,4,6,5)]
-
-# Create percentage output
-rcb_cat_perc <- rcb_cat
-rcb_cat_perc$`Severely cost burdened` <- rcb_cat_perc$`Greater than 50 percent`/rcb_cat_perc$Total
-rcb_cat_perc$`Cost burdened` <- rcb_cat_perc$`Between 30 and 50 percent`/rcb_cat_perc$Total
-rcb_cat_perc$`Not cost burdened` <- rcb_cat_perc$`Less than 30 percent`/rcb_cat_perc$Total
-rcb_cat_perc$`No income or no rent paid` <- rcb_cat_perc$`No rent paid`/rcb_cat_perc$Total
-
-rcb_cat_perc <- rcb_cat_perc[, c(1,7,8,9,10)]
-
-# Exporting tables
+# Exporting tables------------
 
 library(openxlsx)
 
