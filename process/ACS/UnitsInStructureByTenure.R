@@ -20,7 +20,7 @@ create_uis_owner_summary_table <- function(year) {
   
   uis_raw<-get_acs_recs(geography = 'county',
                         table.names = c('B25032'),
-                        years = years,
+                        years = year,
                         counties = c("King", "Kitsap", "Pierce", "Snohomish"),
                         acs.type = 'acs5')
   
@@ -65,13 +65,15 @@ create_uis_owner_summary_table <- function(year) {
   df <- uis_agg_owner_01 %>% 
     bind_rows(uis_agg_owner_02)
   
+  return(df)
+  
 }
 
 #---------------------Summarize data into one table, sort by building size------------------------
 
 # iterate thru each year in the function, stored a list. Combine lists and order output by building size category
 
-all_owner_tables <- map(years, ~create_uis_owner_summary_table(.x)) %>% 
+all_owner_tables <- map(years, ~create_uis_owner_summary_table(.x)) %>%
   reduce(bind_rows)
 
 uis_owner <- all_owner_tables %>% 
