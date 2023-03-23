@@ -1,7 +1,7 @@
 # TITLE: Renter Cost Burden by Race
 # GEOGRAPHIES: PSRC Region
 # DATA SOURCE: ACS PUMS 5YR
-# DATE MODIFIED: 3.21.2023
+# DATE MODIFIED: 3.23.2023
 # AUTHOR: Eric Clute
 
 library(magrittr)
@@ -51,65 +51,59 @@ rcb <- rcb %>% filter(TEN=="Rented") %>%
 
 # ----------------------------- SUMMARIZE BY RACE/ETHNICITY -----------------------------
 # Summarize
-rcb_re <- psrc_pums_count(rcb, group_vars = c("rent_burden","PRACE"))
-rcb_re <- rcb_re[, c(3,4,5,6)]
-rcb_re <- rcb_re %>% pivot_wider(names_from = rent_burden, values_from = c(count, count_moe))
-#
-# Rename columns, recalculate total, and rearrange columns
-rcb_re <- rcb_re %>% rename("No rent paid" = "count_NA")
-rcb_re <- rcb_re %>% rename("Greater than 50 percent" = "count_Greater than 50 percent")
-rcb_re <- rcb_re %>% rename("Between 30 and 50 percent" = "count_Between 30 and 50 percent")
-rcb_re <- rcb_re %>% rename("Less than 30 percent" = "count_Less than 30 percent")
-rcb_re <- rcb_re %>% rename("Total" = "count_Total")
-rcb_re <- rcb_re %>% rename("Greater than 50 percent moe" = "count_moe_Greater than 50 percent")
-rcb_re <- rcb_re %>% rename("Between 30 and 50 percent moe" = "count_moe_Between 30 and 50 percent")
-rcb_re <- rcb_re %>% rename("Less than 30 percent moe" = "count_moe_Less than 30 percent")
-rcb_re <- rcb_re %>% rename("Total moe" = "count_moe_Total")
-rcb_re <- rcb_re %>% rename("No rent paid moe" = "count_moe_NA")
+rcb_re <- psrc_pums_count(rcb, group_vars = c("PRACE","rent_burden"))
+rcb_re <- rcb_re %>% pivot_wider(names_from = rent_burden, values_from = c(count, count_moe, share, share_moe))
 
-rcb_re$Total <- rowSums(rcb_re[,c("Greater than 50 percent", "Between 30 and 50 percent", "Less than 30 percent", "No rent paid")], na.rm=TRUE)
-rcb_re <- rcb_re[, c(1,2,3,4,6,5,7,8,9,11,10)]
+# Numeric table
+rcb_re_num <- rcb_re[, c(3,4,5,6,8,7,9,10,11,13,12)]
 
-# Create percentage output
-rcb_re_perc <- rcb_re
-rcb_re_perc$`Severely cost burdened` <- rcb_re_perc$`Greater than 50 percent`/rcb_re_perc$Total
-rcb_re_perc$`Cost burdened` <- rcb_re_perc$`Between 30 and 50 percent`/rcb_re_perc$Total
-rcb_re_perc$`Not cost burdened` <- rcb_re_perc$`Less than 30 percent`/rcb_re_perc$Total
-rcb_re_perc$`No income or no rent paid` <- rcb_re_perc$`No rent paid`/rcb_re_perc$Total
+# Clean variable names
+rcb_re_num <- rcb_re_num %>% rename_all(~stringr::str_replace_all(.,"count_",""))
+rcb_re_num <- rcb_re_num %>% rename("No rent paid" = "NA")
+rcb_re_num <- rcb_re_num %>% rename("moe_No rent paid" = "moe_NA")
 
-rcb_re_perc <- rcb_re_perc[, c(1,7,8,9,10)]
-# 
-# # ----------------------------- SUMMARIZE BY COST BURDEN CATEGORY -----------------------------
-# # Summarize
-# rcb_cat <- rcb %>% group_by(income_bin,rent_burden) %>% summarize(renters = sum(count))
-# rcb_cat <- rcb_cat %>% pivot_wider(names_from = rent_burden, values_from = renters)
-# 
-# # Rename NA column to "No rent paid", recalculate total column, and rearrange columns
-# rcb_cat <- rcb_cat %>% rename("No rent paid" = "NA")
-# rcb_cat$Total <- rowSums(rcb_cat[,c("Greater than 50 percent", "Between 30 and 50 percent", "Less than 30 percent", "No rent paid")], na.rm=TRUE)
-# rcb_cat <- rcb_cat[, c(1,2,3,4,6,5)]
-# 
-# # Create percentage output
-# rcb_cat_perc <- rcb_cat
-# rcb_cat_perc$`Severely cost burdened` <- rcb_cat_perc$`Greater than 50 percent`/rcb_cat_perc$Total
-# rcb_cat_perc$`Cost burdened` <- rcb_cat_perc$`Between 30 and 50 percent`/rcb_cat_perc$Total
-# rcb_cat_perc$`Not cost burdened` <- rcb_cat_perc$`Less than 30 percent`/rcb_cat_perc$Total
-# rcb_cat_perc$`No income or no rent paid` <- rcb_cat_perc$`No rent paid`/rcb_cat_perc$Total
-# 
-# rcb_cat_perc <- rcb_cat_perc[, c(1,7,8,9,10)]
+# Percentage table
+rcb_re_perc <- rcb_re[, c(3,14,15,16,18,17,19,20,21,23,22)]
 
+# Clean variable names
+rcb_re_perc <- rcb_re_perc %>% rename_all(~stringr::str_replace_all(.,"share_",""))
+rcb_re_perc <- rcb_re_perc %>% rename("No rent paid" = "NA")
+rcb_re_perc <- rcb_re_perc %>% rename("moe_No rent paid" = "moe_NA")
+
+
+# ----------------------------- SUMMARIZE BY COST BURDEN CATEGORY -----------------------------
+
+# Summarize
+rcb_cat <- psrc_pums_count(rcb, group_vars = c("income_bin","rent_burden"))
+rcb_cat <- rcb_cat %>% pivot_wider(names_from = rent_burden, values_from = c(count, count_moe, share, share_moe))
+
+# Numeric table
+rcb_cat_num <- rcb_cat[, c(3,4,5,6,8,7,9,10,11,13,12)]
+
+# Clean variable names
+rcb_cat_num <- rcb_cat_num %>% rename_all(~stringr::str_replace_all(.,"count_",""))
+rcb_cat_num <- rcb_cat_num %>% rename("No rent paid" = "NA")
+rcb_cat_num <- rcb_cat_num %>% rename("moe_No rent paid" = "moe_NA")
+
+# Percentage table
+rcb_cat_perc <- rcb_cat[, c(3,14,15,16,18,17,19,20,21,23,22)]
+
+# Clean variable names
+rcb_cat_perc <- rcb_cat_perc %>% rename_all(~stringr::str_replace_all(.,"share_",""))
+rcb_cat_perc <- rcb_cat_perc %>% rename("No rent paid" = "NA")
+rcb_cat_perc <- rcb_cat_perc %>% rename("moe_No rent paid" = "moe_NA")
 
 # Exporting tables------------
 
 library(openxlsx)
 
 work_book <- createWorkbook()
-addWorksheet(work_book, sheetName = "CostBurdenbyRE")
-writeData(work_book, "CostBurdenbyRE", rcb_re)
-addWorksheet(work_book, sheetName = "CostBurdenbyRE_perc")
-writeData(work_book, "CostBurdenbyRE_perc", rcb_re_perc)
-addWorksheet(work_book, sheetName = "CostBurdenbyCategory")
-writeData(work_book, "CostBurdenbyCategory", rcb_cat)
-addWorksheet(work_book, sheetName = "CostBurdenbyCat_perc")
-writeData(work_book, "CostBurdenbyCat_perc", rcb_cat_perc)
-saveWorkbook(work_book, file = "Renter Cost Burden by RE - Burden Category/rcb_r_output_20215YRPUMS.xlsx", overwrite = TRUE)
+addWorksheet(work_book, sheetName = "rcb_by_RE numeric")
+writeData(work_book, "rcb_by_RE numeric", rcb_re_num)
+addWorksheet(work_book, sheetName = "rcb_by_RE percent")
+writeData(work_book, "rcb_by_RE percent", rcb_re_perc)
+addWorksheet(work_book, sheetName = "rcb_by_income numeric")
+writeData(work_book, "rcb_by_income numeric", rcb_cat_num)
+addWorksheet(work_book, sheetName = "rcb_by_income percent")
+writeData(work_book, "rcb_by_income percent", rcb_cat_perc)
+saveWorkbook(work_book, file = "Renter Cost Burden by RE - Income/r_output.xlsx", overwrite = TRUE)
