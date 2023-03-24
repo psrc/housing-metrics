@@ -1,7 +1,7 @@
 # TITLE: Units in Structure by Tenure
 # GEOGRAPHIES: PSRC Region & County
-# DATA SOURCE: 5YR ACS Data 2006-2010 and 2017-21
-# LAST EDITED: 3.21.2023
+# DATA SOURCE: 5YR ACS Data 2006-2010 and 2017-2021
+# LAST EDITED: 3.23.2023
 # AUTHOR: Eric Clute & Christy Lam
 
 library(psrccensus)
