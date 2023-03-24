@@ -176,7 +176,8 @@ calc_share_growth <- function(table) {
     arrange(name, building_size) %>% 
     group_by(name, building_size) %>% 
     mutate(growth = estimate-lag(estimate)) %>% 
-    mutate(growth_share = growth/lag(total)) %>% 
+    mutate(total_diff = total - lag(total)) %>% 
+    mutate(growth_share = growth/total_diff) %>% 
     arrange(factor(name, levels = c('King County', 'Kitsap County', 'Pierce County', 'Snohomish County', 'Region')))
 }
 
