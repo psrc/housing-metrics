@@ -1,7 +1,7 @@
 # TITLE: Renter Cost Burden by Race
 # GEOGRAPHIES: PSRC Region
 # DATA SOURCE: ACS PUMS 5YR
-# DATE MODIFIED: 3.23.2023
+# DATE MODIFIED: 3.27.2023
 # AUTHOR: Eric Clute
 
 library(magrittr)
@@ -106,4 +106,4 @@ addWorksheet(work_book, sheetName = "rcb_by_income numeric")
 writeData(work_book, "rcb_by_income numeric", rcb_cat_num)
 addWorksheet(work_book, sheetName = "rcb_by_income percent")
 writeData(work_book, "rcb_by_income percent", rcb_cat_perc)
-saveWorkbook(work_book, file = "Renter Cost Burden by RE - Income/r_output.xlsx", overwrite = TRUE)
+saveWorkbook(work_book, file = "Renter Cost Burden by RE - Burden Category/r_output 2021 5YR.xlsx", overwrite = TRUE)
