@@ -25,29 +25,42 @@ grossrent <- DP04Table_raw %>%
          grossrent = estimate,
          grossrent_moe = moe)
 
-#------------ Median Renter HH Income by Race/Ethnicity Per County & Regional Total ------------
+#------------ Median Renter HH Income by Race/Ethnicity ------------
 
 pums_raw <- get_psrc_pums(5,2020,"h",c("PRACE","TEN","HINCP"))
 
-incbyre<- psrc_pums_median(pums_raw, "HINCP", group_vars = c("COUNTY","TEN", "PRACE"))
-incbyre_region<- psrc_pums_median(pums_raw, "HINCP", group_vars = c("TEN", "PRACE"))
+# Create/modify variables
+pums <- pums_raw %>% 
+  mutate(PRACE=factor(
+           case_when(grepl("Other Race|Two or More Races", PRACE) ~"Other or Multiple Races",
+                     grepl("^Black ", PRACE) ~"Black",
+                     grepl("^Hispanic ", PRACE) ~"Hispanic/Latinx",
+                     grepl(" or ", PRACE) ~ stringr::str_replace(PRACE, " or ","/"),
+                     grepl(" and ", PRACE) ~ stringr::str_replace(PRACE, " and ","/"),
+                     grepl(" alone", PRACE) ~ stringr::str_replace(PRACE, " alone",""))))
 
-incbyre_county_region <- rbind(incbyre, incbyre_region)
+incbyre<- psrc_pums_median(pums, "HINCP", group_vars = c("TEN", "PRACE"))
+incbyre <- filter(incbyre, TEN == "Rented")
+
+# Create new fields, calculate cost max rent, moe upper/lower, and RR (relative reliability) score
+incbyre$maxmonthlyrent <- incbyre$HINCP_median/12*0.3
+incbyre$moeupperbound <- incbyre$HINCP_median + incbyre$HINCP_median_moe
+incbyre$moelowerbound <- incbyre$HINCP_median - incbyre$HINCP_median_moe
+incbyre$rr_score <- (incbyre$HINCP_median_moe/1.645)/incbyre$HINCP_median*100
+
+# Remove race/ethnicities that have an RR score of more than 5, drop total row
+incbyre <- filter(incbyre, rr_score < 5)
+incbyre <- incbyre %>% filter(!row_number() %in% c(5))
+
+#-------------- Combine and analyze/locate which tracts are affordable to each R/E category --------------
 
 
-incbyre_final <- filter(incbyre_county_region, TEN == "Rented")
 
-incbyre_final$maxmonthlyrent <- incbyre_final$HINCP_median/12*0.3
-incbyre_final$moeupperbound <- incbyre_final$HINCP_median + incbyre_final$HINCP_median_moe
-incbyre_final$moelowerbound <- incbyre_final$HINCP_median - incbyre_final$HINCP_median_moe
 
 #-------------- Write to Excel --------------
 library(openxlsx)
 
 setwd("J:/Projects/V2050/Housing/Monitoring/2023Update")
-
-write.xlsx(incbyre_final, "MedianRenterHHIncomeByRE.xlsx")
-write.xlsx(grossrent, "GrossMedianRentBy2020tract.xlsx")
 
 work_book <- createWorkbook()
 addWorksheet(work_book, sheetName = "medianrenter_inc_re")
