@@ -1,7 +1,7 @@
 # TITLE: Affordable Rental Housing by Tract - for each R/E Category
 # GEOGRAPHIES: PSRC Region & County
 # DATA SOURCE: 5YR ACS Data 2017-21
-# LAST EDITED: 3.28.2023
+# LAST EDITED: 3.29.2023
 # AUTHOR: Eric Clute
 
 library(psrccensus)
@@ -26,8 +26,7 @@ grossrent <- DP04Table_raw %>%
          grossrent_moe = moe)
 
 #------------ Median Renter HH Income by Race/Ethnicity ------------
-
-pums_raw <- get_psrc_pums(5,2020,"h",c("PRACE","TEN","HINCP"))
+pums_raw <- get_psrc_pums(5,2021,"h",c("PRACE","TEN","HINCP"))
 
 # Create/modify variables
 pums <- pums_raw %>% 
@@ -48,24 +47,20 @@ incbyre$moeupperbound <- incbyre$HINCP_median + incbyre$HINCP_median_moe
 incbyre$moelowerbound <- incbyre$HINCP_median - incbyre$HINCP_median_moe
 incbyre$rr_score <- (incbyre$HINCP_median_moe/1.645)/incbyre$HINCP_median*100
 
-# Remove race/ethnicities that have an RR score of more than 5, drop total row
+# Remove race/ethnicities that have an RR score of more than 5, drop "Other Race" and total rows
 incbyre <- filter(incbyre, rr_score < 5)
-incbyre <- incbyre %>% filter(!row_number() %in% c(5))
+incbyre <- incbyre %>% filter(!row_number() %in% c(4,6))
 
-#-------------- Combine and analyze/locate which tracts are affordable to each R/E category --------------
+#-------------- Indicate which tracts are affordable to each R/E category --------------
+incbyre_piv <- incbyre[, c(4,7)]
+incbyre_piv <- incbyre_piv %>% pivot_wider(names_from = PRACE, values_from = maxmonthlyrent)
 
-
-
+grossrent$affordable_asian <- ifelse(incbyre_piv$Asian >= grossrent$grossrent, 1, 0)
+grossrent$affordable_black <- ifelse(incbyre_piv$Black >= grossrent$grossrent, 1, 0)
+grossrent$affordable_hispanic <- ifelse(incbyre_piv$`Hispanic/Latinx` >= grossrent$grossrent, 1, 0)
+grossrent$affordable_white <- ifelse(incbyre_piv$White >= grossrent$grossrent, 1, 0)
 
 #-------------- Write to Excel --------------
-library(openxlsx)
-
 setwd("J:/Projects/V2050/Housing/Monitoring/2023Update")
 
-work_book <- createWorkbook()
-addWorksheet(work_book, sheetName = "medianrenter_inc_re")
-writeData(work_book, "medianrenter_inc_re", incbyre_final)
-addWorksheet(work_book, sheetName = "grosrent_tract")
-writeData(work_book, "grosrent_tract", grossrent)
-saveWorkbook(work_book, file = "Access to Affordable Rental Housing/r_output 2021 5YR.xlsx", overwrite = TRUE)
-
+write.csv(grossrent, "Access to Affordable Rental Housing/r_output 2021 5YR.csv", row.names=FALSE)
