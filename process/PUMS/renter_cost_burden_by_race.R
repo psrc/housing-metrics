@@ -45,9 +45,9 @@ rcb <- rcb %>% filter(TEN=="Rented") %>%
             case_when(grepl("Other Race|Two or More Races", PRACE) ~"Other or Multiple Races",
                       grepl("^Black ", PRACE) ~"Black",
                       grepl("^Hispanic ", PRACE) ~"Hispanic/Latinx",
-                      grepl(" or ", PRACE) ~ stringr::str_replace(PRACE, " or ","/"),
-                      grepl(" and ", PRACE) ~ stringr::str_replace(PRACE, " and ","/"),
-                      grepl(" alone", PRACE) ~ stringr::str_replace(PRACE, " alone",""))))
+                      !is.na(PRACE) ~stringr::str_replace_all(as.character(PRACE), " (and|or) ", "/") %>%
+                        stringr::str_replace(" alone", "") %>%
+                        stringr::str_replace(" Alone", ""))))
 
 # ----------------------------- SUMMARIZE BY RACE/ETHNICITY -----------------------------
 # Summarize
