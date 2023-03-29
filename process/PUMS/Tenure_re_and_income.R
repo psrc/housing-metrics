@@ -51,6 +51,7 @@ tenure_re_piv <- tenure_re %>%
               names_from = 'tenure',
               values_from = c('count', 'count_moe', 'share', 'share_moe'))
 
+tenure_re_piv <- tenure_re_piv[, c(1,2,9,10,12,13,11,14,3,4,5,6,7,8)]
 
 #-------------- Group by Tenure (ownership), Income, R/E Category --------------
 tenure_inc_re <- psrc_pums_count(pums_new_vars, group_vars = c("income_bin","PRACE","tenure"))
