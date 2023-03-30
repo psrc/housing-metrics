@@ -1,13 +1,14 @@
 # TITLE: Tenure by Race/Ethnicity and Income
 # GEOGRAPHIES: PSRC Region & County
 # DATA SOURCE: 2021 5YR ACS PUMS
-# DATE MODIFIED: 3.27.2023
+# DATE MODIFIED: 3.30.2023
 # AUTHOR: Eric Clute & Carol Naito
 
 library(psrccensus)
 library(magrittr)
 library(dplyr)
 library(srvyr)
+library(tidyr)
 library(openxlsx)
 
 # Obtain the data
@@ -57,7 +58,6 @@ tenure_re_piv <- tenure_re_piv[, c(1,2,9,10,12,13,11,14,3,4,5,6,7,8)]
 tenure_inc_re <- psrc_pums_count(pums_new_vars, group_vars = c("income_bin","PRACE","tenure"))
 tenure_inc_re <- tenure_inc_re %>% filter(tenure=='owner')
 
-
 # Pivot the table
 tenure_inc_re_piv <- tenure_inc_re %>% 
   pivot_wider(id_cols = c( 'DATA_YEAR', 'tenure', 'PRACE'),
@@ -65,6 +65,9 @@ tenure_inc_re_piv <- tenure_inc_re %>%
               values_from = c('count', 'count_moe', 'share', 'share_moe'))
 
 tenure_inc_re_piv<- tenure_inc_re_piv[, c(1,2,3,16,17,18,19,20,21,22,23,24,25,26,27,4,5,6,7,8,9,10,11,12,13,14,15)]
+
+# Limit to 4 largest RE groups (Asian, Black, Hispanic, White)
+tenure_inc_re_piv <- tenure_inc_re_piv %>% filter(!row_number() %in% c(1,5,6))
 
 #-------------- Write to Excel --------------
 
