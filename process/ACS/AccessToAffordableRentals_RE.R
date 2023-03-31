@@ -1,7 +1,7 @@
 # TITLE: Affordable Rental Housing by Tract - for each R/E Category
 # GEOGRAPHIES: PSRC Region & County
 # DATA SOURCE: 5YR ACS Data 2017-21
-# LAST EDITED: 3.29.2023
+# LAST EDITED: 3.31.2023
 # AUTHOR: Eric Clute
 
 library(psrccensus)
@@ -47,13 +47,12 @@ incbyre$moeupperbound <- incbyre$HINCP_median + incbyre$HINCP_median_moe
 incbyre$moelowerbound <- incbyre$HINCP_median - incbyre$HINCP_median_moe
 incbyre$rr_score <- (incbyre$HINCP_median_moe/1.645)/incbyre$HINCP_median*100
 
-# Remove race/ethnicities that have an RR score of more than 5, drop "Other Race" and total rows
-incbyre <- filter(incbyre, rr_score < 5)
-incbyre <- incbyre %>% filter(!row_number() %in% c(4,6))
-
-#-------------- Indicate which tracts are affordable to each R/E category --------------
+# Create RE reference table
+incbyre <- incbyre[incbyre$PRACE %in% c("Asian", "Black", "Hispanic/Latinx", "White"),]
 incbyre_piv <- incbyre[, c(4,7)]
 incbyre_piv <- incbyre_piv %>% pivot_wider(names_from = PRACE, values_from = maxmonthlyrent)
+
+#-------------- Indicate which tracts are affordable to each R/E category --------------
 
 grossrent$affordable_asian <- ifelse(incbyre_piv$Asian >= grossrent$grossrent, 1, 0)
 grossrent$affordable_black <- ifelse(incbyre_piv$Black >= grossrent$grossrent, 1, 0)
