@@ -19,23 +19,23 @@ mb_hai_raw = read.xlsx(url, sheet=2)
 ftb_hai_raw = read.xlsx(url, sheet=3)
 
 # --------------- Median Home Buyer (HAI) ---------------
-# Select Only Q1 variables
+# Select County and Q1 variables
 select_county <- grep("County", names(mb_hai_raw))
 select_q1 <- grep("Q1", names(mb_hai_raw))
 
 mb_hai <- mb_hai_raw %>% select(c(select_county,select_q1))
 
-# Select only our 4 counties
+# Select PSRC counties
 mb_hai <- mb_hai[mb_hai$County %in% c("King", "Kitsap", "Pierce", "Snohomish"),]
 
 # --------------- First-Time Home Buyer (HAI) ---------------
-# Select Only Q1 variables
+# Select County and Q1 variables
 select_county <- grep("County", names(ftb_hai_raw))
 select_q1 <- grep("Q1", names(ftb_hai_raw))
 
 ftb_hai <- ftb_hai_raw %>% select(c(select_county,select_q1))
 
-# Select only our 4 counties
+# Select PSRC counties
 ftb_hai <- ftb_hai[ftb_hai$County %in% c("King", "Kitsap", "Pierce", "Snohomish"),]
 
 # --------------- Export to Excel ---------------
