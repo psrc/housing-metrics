@@ -1,6 +1,6 @@
 # TITLE: Median Sale Price by County
 # GEOGRAPHIES: All four counties
-# DATA SOURCE: Redfin (https://public.tableau.com/shared/JJ67ZXN9N)
+# DATA SOURCE: Redfin February 2023 (https://public.tableau.com/shared/JJ67ZXN9N)
 # DATE MODIFIED: 3.30.2023
 # AUTHOR: Eric Clute
 
