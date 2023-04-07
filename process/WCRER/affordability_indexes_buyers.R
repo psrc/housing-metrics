@@ -20,7 +20,7 @@ ftb_hai_raw = read.xlsx(url, sheet=3)
 select_county <- grep("County", names(mb_hai_raw))
 select_q1 <- grep("Q1", names(mb_hai_raw))
 
-mb_hai <- mb_hai_raw %>% select(c(select_county,select_q1))
+mb_hai <- mb_hai_raw %>% select(all_of(c(select_county,select_q1)))
 
 # Select PSRC counties
 mb_hai <- mb_hai[mb_hai$County %in% c("King", "Kitsap", "Pierce", "Snohomish"),]
@@ -30,7 +30,7 @@ mb_hai <- mb_hai[mb_hai$County %in% c("King", "Kitsap", "Pierce", "Snohomish"),]
 select_county <- grep("County", names(ftb_hai_raw))
 select_q1 <- grep("Q1", names(ftb_hai_raw))
 
-ftb_hai <- ftb_hai_raw %>% select(c(select_county,select_q1))
+ftb_hai <- ftb_hai_raw %>% select(all_of(c(select_county,select_q1)))
 
 # Select PSRC counties
 ftb_hai <- ftb_hai[ftb_hai$County %in% c("King", "Kitsap", "Pierce", "Snohomish"),]
