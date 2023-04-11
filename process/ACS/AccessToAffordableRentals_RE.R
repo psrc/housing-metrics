@@ -25,6 +25,15 @@ grossrent <- DP04Table_raw %>%
          grossrent = estimate,
          grossrent_moe = moe)
 
+# Evaluate RR scores - can we trust these data?
+grossrent$rr_score <- (grossrent$grossrent_moe/1.645)/grossrent$grossrent*100
+grossrent <- grossrent %>%
+  mutate(rr_score=factor(case_when(rr_score <= 15 ~"good",
+                                   rr_score <= 30 ~"fair",
+                                   rr_score <= 50 ~"weak",
+                                   rr_score > 50 ~"unreliable",
+                                   !is.na(rr_score) ~ NA)))
+
 #------------ Median Renter HH Income by Race/Ethnicity ------------
 pums_raw <- get_psrc_pums(5,2021,"h",c("PRACE","TEN","HINCP"))
 
@@ -38,18 +47,17 @@ pums <- pums_raw %>% mutate(PRACE=factor(
             stringr::str_replace(" alone", "") %>%
             stringr::str_replace(" Alone", ""))))
 
-incbyre<- psrc_pums_median(pums, "HINCP", group_vars = c("TEN", "PRACE"))
+incbyre<- psrc_pums_median(pums, "HINCP", group_vars = c("TEN", "PRACE"),rr=TRUE)
 incbyre <- filter(incbyre, TEN == "Rented")
 
 # Create new fields, calculate cost max rent, moe upper/lower, and RR (relative reliability) score
 incbyre$maxmonthlyrent <- incbyre$HINCP_median/12*0.3
 incbyre$moeupperbound <- incbyre$HINCP_median + incbyre$HINCP_median_moe
 incbyre$moelowerbound <- incbyre$HINCP_median - incbyre$HINCP_median_moe
-incbyre$rr_score <- (incbyre$HINCP_median_moe/1.645)/incbyre$HINCP_median*100
 
 # Create RE reference table
 incbyre <- incbyre[incbyre$PRACE %in% c("Asian", "Black", "Hispanic/Latinx", "White"),]
-incbyre_piv <- incbyre[, c(4,7)]
+incbyre_piv <- incbyre[, c(4,8)]
 incbyre_piv <- incbyre_piv %>% pivot_wider(names_from = PRACE, values_from = maxmonthlyrent)
 
 #-------------- Indicate which tracts are affordable to each R/E category --------------
