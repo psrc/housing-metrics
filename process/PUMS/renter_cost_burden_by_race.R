@@ -51,7 +51,7 @@ rcb <- rcb %>% filter(TEN=="Rented") %>%
 
 # ----------------------------- SUMMARIZE BY RACE/ETHNICITY -----------------------------
 # Summarize
-rcb_re <- psrc_pums_count(rcb, group_vars = c("PRACE","rent_burden"))
+rcb_re <- psrc_pums_count(rcb, group_vars = c("PRACE","rent_burden"),rr=TRUE)
 rcb_re <- rcb_re %>% pivot_wider(names_from = rent_burden, values_from = c(count, count_moe, share, share_moe))
 
 # Numeric table
