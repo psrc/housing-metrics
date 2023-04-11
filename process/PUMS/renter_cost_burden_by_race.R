@@ -1,7 +1,7 @@
 # TITLE: Renter Cost Burden by Race
 # GEOGRAPHIES: PSRC Region
 # DATA SOURCE: ACS PUMS 5YR
-# DATE MODIFIED: 3.27.2023
+# DATE MODIFIED: 4.11.2023
 # AUTHOR: Eric Clute
 
 library(magrittr)
@@ -52,6 +52,7 @@ rcb <- rcb %>% filter(TEN=="Rented") %>%
 # ----------------------------- SUMMARIZE BY RACE/ETHNICITY -----------------------------
 # Summarize
 rcb_re <- psrc_pums_count(rcb, group_vars = c("PRACE","rent_burden"),rr=TRUE)
+rcb_re <- rcb_re[, c(1,2,3,4,5,6,8,9)] # Check the RR to see if we trust these numbers. This line removes the RR column due to below transformation of tables
 rcb_re <- rcb_re %>% pivot_wider(names_from = rent_burden, values_from = c(count, count_moe, share, share_moe))
 
 # Numeric table
@@ -74,7 +75,8 @@ rcb_re_perc <- rcb_re_perc %>% rename("moe_No rent paid" = "moe_NA")
 # ----------------------------- SUMMARIZE BY COST BURDEN CATEGORY -----------------------------
 
 # Summarize
-rcb_cat <- psrc_pums_count(rcb, group_vars = c("income_bin","rent_burden"))
+rcb_cat <- psrc_pums_count(rcb, group_vars = c("income_bin","rent_burden"),rr=TRUE)
+rcb_cat <- rcb_cat[, c(1,2,3,4,5,6,8,9)] # Check the RR to see if we trust these numbers. This line removes the RR column due to below transformation of tables
 rcb_cat <- rcb_cat %>% pivot_wider(names_from = rent_burden, values_from = c(count, count_moe, share, share_moe))
 
 # Numeric table
