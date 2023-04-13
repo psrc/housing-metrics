@@ -1,7 +1,7 @@
 # TITLE: Renter Cost Burden by Race
 # GEOGRAPHIES: PSRC Region
 # DATA SOURCE: ACS PUMS 5YR
-# DATE MODIFIED: 4.11.2023
+# DATE MODIFIED: 4.13.2023
 # AUTHOR: Eric Clute
 
 library(magrittr)
@@ -52,60 +52,39 @@ rcb <- rcb %>% filter(TEN=="Rented") %>%
 # ----------------------------- SUMMARIZE BY RACE/ETHNICITY -----------------------------
 # Summarize
 rcb_re <- psrc_pums_count(rcb, group_vars = c("PRACE","rent_burden"),rr=TRUE)
-rcb_re <- rcb_re[, c(1,2,3,4,5,6,8,9)] # Check the RR to see if we trust these numbers. This line removes the RR column due to below transformation of tables
-rcb_re <- rcb_re %>% pivot_wider(names_from = rent_burden, values_from = c(count, count_moe, share, share_moe))
+rcb_re <- rcb_re %>% pivot_wider(names_from = rent_burden, values_from = c(count, count_moe, share, share_moe, reliability))
 
-# Numeric table
-rcb_re_num <- rcb_re[, c(3,4,5,6,8,7,9,10,11,13,12)]
-
-# Clean variable names
-rcb_re_num <- rcb_re_num %>% rename_all(~stringr::str_replace_all(.,"count_",""))
-rcb_re_num <- rcb_re_num %>% rename("No rent paid" = "NA")
-rcb_re_num <- rcb_re_num %>% rename("moe_No rent paid" = "moe_NA")
-
-# Percentage table
-rcb_re_perc <- rcb_re[, c(3,14,15,16,18,17,19,20,21,23,22)]
+# Clean table
+rcb_re <- rcb_re[, c(3,4,5,6,8,7,9,10,11,13,12,14,15,16,18,17,24,25,26,28,27)]
 
 # Clean variable names
-rcb_re_perc <- rcb_re_perc %>% rename_all(~stringr::str_replace_all(.,"share_",""))
-rcb_re_perc <- rcb_re_perc %>% rename("No rent paid" = "NA")
-rcb_re_perc <- rcb_re_perc %>% rename("moe_No rent paid" = "moe_NA")
-
+rcb_re <- rcb_re %>% rename_all(~stringr::str_replace_all(.,"count_",""))
+rcb_re <- rcb_re %>% rename("No rent paid" = "NA")
+rcb_re <- rcb_re %>% rename("moe_No rent paid" = "moe_NA")
+rcb_re <- rcb_re %>% rename("Share_No rent paid" = "share_NA")
+rcb_re <- rcb_re %>% rename("Reliability_No rent paid" = "reliability_NA")
 
 # ----------------------------- SUMMARIZE BY COST BURDEN CATEGORY -----------------------------
 
 # Summarize
 rcb_cat <- psrc_pums_count(rcb, group_vars = c("income_bin","rent_burden"),rr=TRUE)
-rcb_cat <- rcb_cat[, c(1,2,3,4,5,6,8,9)] # Check the RR to see if we trust these numbers. This line removes the RR column due to below transformation of tables
-rcb_cat <- rcb_cat %>% pivot_wider(names_from = rent_burden, values_from = c(count, count_moe, share, share_moe))
+rcb_cat <- rcb_cat %>% pivot_wider(names_from = rent_burden, values_from = c(count, count_moe, share, share_moe, reliability))
 
-# Numeric table
-rcb_cat_num <- rcb_cat[, c(3,4,5,6,8,7,9,10,11,13,12)]
-
-# Clean variable names
-rcb_cat_num <- rcb_cat_num %>% rename_all(~stringr::str_replace_all(.,"count_",""))
-rcb_cat_num <- rcb_cat_num %>% rename("No rent paid" = "NA")
-rcb_cat_num <- rcb_cat_num %>% rename("moe_No rent paid" = "moe_NA")
-
-# Percentage table
-rcb_cat_perc <- rcb_cat[, c(3,14,15,16,18,17,19,20,21,23,22)]
+# Clean table
+rcb_cat <- rcb_cat[, c(3,4,5,6,8,7,9,10,11,13,12,14,15,16,18,17,24,25,26,28,27)]
 
 # Clean variable names
-rcb_cat_perc <- rcb_cat_perc %>% rename_all(~stringr::str_replace_all(.,"share_",""))
-rcb_cat_perc <- rcb_cat_perc %>% rename("No rent paid" = "NA")
-rcb_cat_perc <- rcb_cat_perc %>% rename("moe_No rent paid" = "moe_NA")
+rcb_cat <- rcb_cat %>% rename_all(~stringr::str_replace_all(.,"count_",""))
+rcb_cat <- rcb_cat %>% rename("No rent paid" = "NA")
+rcb_cat <- rcb_cat %>% rename("Share_No rent paid" = "share_NA")
+rcb_cat <- rcb_cat %>% rename("Reliability_No rent paid" = "reliability_NA")
 
 # Exporting tables------------
 
 library(openxlsx)
-
 work_book <- createWorkbook()
-addWorksheet(work_book, sheetName = "rcb_by_RE numeric")
-writeData(work_book, "rcb_by_RE numeric", rcb_re_num)
-addWorksheet(work_book, sheetName = "rcb_by_RE percent")
-writeData(work_book, "rcb_by_RE percent", rcb_re_perc)
-addWorksheet(work_book, sheetName = "rcb_by_income numeric")
-writeData(work_book, "rcb_by_income numeric", rcb_cat_num)
-addWorksheet(work_book, sheetName = "rcb_by_income percent")
-writeData(work_book, "rcb_by_income percent", rcb_cat_perc)
+addWorksheet(work_book, sheetName = "rcb_by_RE")
+writeData(work_book, "rcb_by_RE", rcb_re)
+addWorksheet(work_book, sheetName = "rcb_by_income")
+writeData(work_book, "rcb_by_income", rcb_cat)
 saveWorkbook(work_book, file = "Renter Cost Burden by RE - Burden Category/r_output 2021 5YR.xlsx", overwrite = TRUE)
