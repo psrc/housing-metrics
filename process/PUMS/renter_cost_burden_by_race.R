@@ -41,13 +41,12 @@ rcb <- rcb %>% filter(TEN=="Rented") %>%
                                        "Between 30 and 50 percent",
                                        "Less than 30 percent",
                                        "No rent paid")),
-          PRACE=factor(
-            case_when(grepl("Other Race|Two or More Races", PRACE) ~"Other or Multiple Races",
-                      grepl("^Black ", PRACE) ~"Black",
-                      grepl("^Hispanic ", PRACE) ~"Hispanic/Latinx",
-                      !is.na(PRACE) ~stringr::str_replace_all(as.character(PRACE), " (and|or) ", "/") %>%
-                        stringr::str_replace(" alone", "") %>%
-                        stringr::str_replace(" Alone", ""))))
+          PRACE=factor(case_when(grepl("Other Race|Two or More Races", PRACE) ~"Other or Multiple Races",
+                                 grepl("^Black ", PRACE) ~"Black",
+                                 grepl("^Hispanic ", PRACE) ~"Hispanic/Latinx",
+                                 !is.na(PRACE) ~stringr::str_replace_all(as.character(PRACE), " (and|or) ", "/") %>%
+                                 stringr::str_replace(" alone", "") %>%
+                                 stringr::str_replace(" Alone", ""))))
 
 # ----------------------------- SUMMARIZE BY RACE/ETHNICITY -----------------------------
 # Summarize
