@@ -11,7 +11,7 @@ library(srvyr)
 library(tidyr)
 library(purrr)
 
-years <- c(2010, 2015, 2021)
+years <- c(2010, 2016, 2021)
 
 # ----------------------------- SUMMARIZE BY RACE/ETHNICITY -----------------------------
 rcb_re_func <- function(year){
@@ -67,17 +67,13 @@ rcb_re_all <- map(years, ~rcb_re_func(.x)) %>%
 library(psrcplot)
 library(ggplot2)
 
-severe_cb_chart <- interactive_line_chart(rcb_re_all, "DATA_YEAR", "share_Greater than 50 percent", fill = "PRACE",
-                                  title="Change in Severe Cost Burden by Race/Ethnicity",
-                                  alt="Change in Severe Cost Burden by Race/Ethnicity",
-                                  color="pgnobgy_5")
-severe_cb_chart
+rcb_re_severe_cb <- interactive_line_chart(rcb_re_all, "DATA_YEAR", "share_Greater than 50 percent", fill = "PRACE",
+                                  title="Change in Severe Cost Burden by Race/Ethnicity",color="pgnobgy_5")
+rcb_re_severe_cb
 
-cb_chart <- interactive_line_chart(rcb_re_all, "DATA_YEAR", "share_Between 30 and 50 percent", fill = "PRACE",
-                                       title="Change in Cost Burden by Race/Ethnicity",
-                                       alt="Change in Cost Burden by Race/Ethnicity",
-                                       color="pgnobgy_5")
-cb_chart
+rcb_re_cb <- interactive_line_chart(rcb_re_all, "DATA_YEAR", "share_Between 30 and 50 percent", fill = "PRACE",
+                                       title="Change in Cost Burden by Race/Ethnicity",color="pgnobgy_5")
+rcb_re_cb
 
 # ----------------------------- SUMMARIZE BY INCOME CATEGORY -----------------------------
 rcb_inc_func <- function(year){
@@ -141,16 +137,14 @@ rcb_inc_all <- map(years, ~rcb_inc_func(.x)) %>%
 library(psrcplot)
 library(ggplot2)
 
+# rcb_inc_all_chart <- rcb_inc_all[!is.na(rcb_inc_all$`Greater than 50 percent`),]
+
 rcb_inc_severe_cb <- interactive_line_chart(rcb_inc_all, "DATA_YEAR", "share_Greater than 50 percent", fill = "income_bin",
-                                          title="Change in Severe Cost Burden by Income (50%+ of income)",
-                                          alt="Change in Severe Cost Burden by Income",
-                                          color="pgnobgy_5")
+                                          title="Change in Severe Cost Burden by Income (50%+ of income)",color="pgnobgy_5")
 rcb_inc_severe_cb
 
 rcb_inc_cb <- interactive_line_chart(rcb_inc_all, "DATA_YEAR", "share_Between 30 and 50 percent", fill = "income_bin",
-                                   title="Change in Cost Burden by Income (30-50% of income)",
-                                   alt="Change in Cost Burden by Income",
-                                   color="pgnobgy_5")
+                                   title="Change in Cost Burden by Income (30-50% of income)",color="pgnobgy_5")
 rcb_inc_cb
 
 # Exporting tables------------
@@ -159,6 +153,6 @@ library(openxlsx)
 work_book <- createWorkbook()
 addWorksheet(work_book, sheetName = "rcb_re_all")
 writeData(work_book, "rcb_re_all", rcb_re)
-addWorksheet(work_book, sheetName = "rcb_by_income")
-writeData(work_book, "rcb_by_income", rcb_inc)
-saveWorkbook(work_book, file = "Renter Cost Burden by RE - Burden Category/r_output 2021 5YR.xlsx", overwrite = TRUE)
+addWorksheet(work_book, sheetName = "rcb_inc_all")
+writeData(work_book, "rcb_inc_all", rcb_inc)
+saveWorkbook(work_book, file = "Renter Cost Burden by RE - Burden Category/r_output.xlsx", overwrite = TRUE)
