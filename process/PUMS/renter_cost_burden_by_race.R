@@ -58,12 +58,10 @@ rcb_re_func <- function(year){
 }
 
 # Run rcb function -----------
-
 rcb_re_all <- map(years, ~rcb_re_func(.x)) %>%
   reduce(bind_rows)
 
 # graph change over time -----------
-
 library(psrcplot)
 library(ggplot2)
 
@@ -128,22 +126,20 @@ rcb_inc_func <- function(year){
 }
 
 # Run rcb function -----------
-
 rcb_inc_all <- map(years, ~rcb_inc_func(.x)) %>%
   reduce(bind_rows)
 
 # graph change over time -----------
-
 library(psrcplot)
 library(ggplot2)
 
-# rcb_inc_all_chart <- rcb_inc_all[!is.na(rcb_inc_all$`Greater than 50 percent`),]
-
-rcb_inc_severe_cb <- interactive_line_chart(rcb_inc_all, "DATA_YEAR", "share_Greater than 50 percent", fill = "income_bin",
+# Removes NA rows - ensures the chart works correctly
+rcb_inc_all_chart <- rcb_inc_all[!is.na(rcb_inc_all$`Greater than 50 percent`),]
+rcb_inc_severe_cb <- interactive_line_chart(rcb_inc_all_chart, "DATA_YEAR", "share_Greater than 50 percent", fill = "income_bin",
                                           title="Change in Severe Cost Burden by Income (50%+ of income)",color="pgnobgy_5")
 rcb_inc_severe_cb
 
-rcb_inc_cb <- interactive_line_chart(rcb_inc_all, "DATA_YEAR", "share_Between 30 and 50 percent", fill = "income_bin",
+rcb_inc_cb <- interactive_line_chart(rcb_inc_all_chart, "DATA_YEAR", "share_Between 30 and 50 percent", fill = "income_bin",
                                    title="Change in Cost Burden by Income (30-50% of income)",color="pgnobgy_5")
 rcb_inc_cb
 
