@@ -1,7 +1,7 @@
 # TITLE: Tenure by Race/Ethnicity and Income
 # GEOGRAPHIES: PSRC Region & County
 # DATA SOURCE: 2021 5YR ACS PUMS
-# DATE MODIFIED: 4.28.2023
+# DATE MODIFIED: 5.02.2023
 # AUTHOR: Eric Clute & Carol Naito
 
 library(psrccensus)
@@ -71,7 +71,7 @@ library(psrcplot)
 library(ggplot2)
 
 ownership_re <- interactive_line_chart(tenure_re_piv_all, "DATA_YEAR", "share_owner", fill = "PRACE",
-                                           title="Change in Ownership by Race/Ethnicity",color="pgnobgy_5")
+                                           title="Change in Ownership by Race/Ethnicity",color="pognbgy_10")
 ownership_re
 
 #-------------- Group by Tenure (ownership), Income, R/E Category --------------
@@ -146,10 +146,11 @@ tenure_inc_re_all <- map(years, ~tenure_inc_func(.x)) %>%
   reduce(bind_rows)
 
 #-------------- Write to Excel --------------
+setwd("J:/Projects/V2050/Housing/Monitoring/2023Update")
 
 work_book <- createWorkbook()
 addWorksheet(work_book, sheetName = "tenure by RE")
 writeData(work_book, "tenure by RE", tenure_re_piv_all)
 addWorksheet(work_book, sheetName = "ownership by RE & inc")
 writeData(work_book, "ownership by RE & inc", tenure_inc_re_all)
-saveWorkbook(work_book, file = "Tenure by RE and Income/r_output 2021 5YR.xlsx", overwrite = TRUE)
+saveWorkbook(work_book, file = "Tenure by RE and Income/r_output.xlsx", overwrite = TRUE)
