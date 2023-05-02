@@ -1,7 +1,7 @@
 # TITLE: Renter Cost Burden by Race
 # GEOGRAPHIES: PSRC Region
 # DATA SOURCE: ACS PUMS 5YR
-# DATE MODIFIED: 4.26.2023
+# DATE MODIFIED: 5.02.2023
 # AUTHOR: Eric Clute
 
 library(magrittr)
@@ -66,11 +66,11 @@ library(psrcplot)
 library(ggplot2)
 
 rcb_re_severe_cb <- interactive_line_chart(rcb_re_all, "DATA_YEAR", "share_Greater than 50 percent", fill = "PRACE",
-                                  title="Change in Severe Cost Burden by Race/Ethnicity",color="pgnobgy_5")
+                                  title="Change in Severe Cost Burden by Race/Ethnicity (50%+ of income)",color="pgnobgy_5")
 rcb_re_severe_cb
 
 rcb_re_cb <- interactive_line_chart(rcb_re_all, "DATA_YEAR", "share_Between 30 and 50 percent", fill = "PRACE",
-                                       title="Change in Cost Burden by Race/Ethnicity",color="pgnobgy_5")
+                                       title="Change in Cost Burden by Race/Ethnicity (30-50% of income)",color="pgnobgy_5")
 rcb_re_cb
 
 # ----------------------------- SUMMARIZE BY INCOME CATEGORY -----------------------------
@@ -148,7 +148,7 @@ rcb_inc_cb
 library(openxlsx)
 work_book <- createWorkbook()
 addWorksheet(work_book, sheetName = "rcb_re_all")
-writeData(work_book, "rcb_re_all", rcb_re)
+writeData(work_book, "rcb_re_all", rcb_re_all)
 addWorksheet(work_book, sheetName = "rcb_inc_all")
-writeData(work_book, "rcb_inc_all", rcb_inc)
+writeData(work_book, "rcb_inc_all", rcb_inc_all)
 saveWorkbook(work_book, file = "Renter Cost Burden by RE - Burden Category/r_output.xlsx", overwrite = TRUE)
