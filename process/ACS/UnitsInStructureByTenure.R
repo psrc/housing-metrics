@@ -1,7 +1,7 @@
 # TITLE: Units in Structure by Tenure
 # GEOGRAPHIES: PSRC Region & County
 # DATA SOURCE: 5YR ACS Data 2006-2010 and 2017-2021
-# LAST EDITED: 4.11.2023
+# LAST EDITED: 5.05.2023
 # AUTHOR: Eric Clute & Christy Lam
 
 library(psrccensus)
@@ -41,10 +41,15 @@ create_uis_owner_summary_table <- function(year) {
                                             grepl("_009$|_010$", variable) ~ "20+ units",
                                             grepl("_011$|_012$", variable) ~ "Mobile Home/Other",
                                             TRUE ~ NA_character_),
-                                  levels=c("Single Family","2-19 units", "20+ units", "Mobile Home/Other")
-    ))
+                                  levels=c("Single Family","2-19 units", "20+ units", "Mobile Home/Other"))) %>%
+    mutate(building_size_3=factor(case_when(grepl("_003$", variable) ~ "Single Family",
+                                            grepl("_004$|_005$|_006$|_007$", variable) ~ "2-9 units",
+                                            grepl("_008$|_009$|_010$", variable) ~ "10+ units",
+                                            grepl("_011$|_012$", variable) ~ "Mobile Home/Other",
+                                            TRUE ~ NA_character_),
+                                  levels=c("Single Family","2-9 units", "10+ units", "Mobile Home/Other")))
   
-  #--------------------Aggregate data, incorporate 2-19 Unit group------------------------
+  #--------------------Aggregate data, incorporate 2-19 Unit group and 2-9 Unit group ------------------------
   
   # In this step, you create an aggregate, using the grouping you created in the last call.
   uis_agg_owner <- summarize(uis_raw, estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE)) 
@@ -55,15 +60,22 @@ create_uis_owner_summary_table <- function(year) {
     group_by(across(c(name, year, building_size))) %>% 
     summarize(estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE))
   
-  # In this step, you create an aggregate, using the second grouping you created.
+  # In this step, you create an aggregate, using the 2-19 grouping
   uis_agg_owner_02 <- uis_coded %>%
     group_by(across(c(name, year, building_size_2))) %>%
     summarize(estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE)) %>% 
     filter(building_size_2 == '2-19 units') %>% 
     rename(building_size = building_size_2)
   
+  # In this step, you create an aggregate, using the 2-9 grouping
+  uis_agg_owner_03 <- uis_coded %>%
+    group_by(across(c(name, year, building_size_3))) %>%
+    summarize(estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE)) %>% 
+    filter(building_size_3 == '2-9 units') %>% 
+    rename(building_size = building_size_3)
+  
   df <- uis_agg_owner_01 %>% 
-    bind_rows(uis_agg_owner_02)
+    bind_rows(list(uis_agg_owner_02, uis_agg_owner_03))
   
   return(df)
   
@@ -78,7 +90,7 @@ all_owner_tables <- map(years, ~create_uis_owner_summary_table(.x)) %>%
 
 uis_owner <- all_owner_tables %>% 
   mutate(building_size = factor(building_size,
-                                levels = c('Single Family', '2-4 units', '5-19 units', '2-19 units', '20+ units', 'Mobile Home/Other'))) %>% 
+                                levels = c('Single Family', '2-4 units', '2-9 units', '5-19 units', '2-19 units', '20+ units', 'Mobile Home/Other'))) %>% 
   arrange(year, name, building_size) %>% 
   filter(building_size != is.na(building_size))
 
@@ -114,9 +126,14 @@ create_uis_renter_summary_table <- function(year) {
                                             grepl("_020$|_021$", variable) ~ "20+ units",
                                             grepl("_022$|_023$", variable) ~ "Mobile Home/Other",
                                             TRUE ~ NA_character_),
-                                  levels=c("Single Family","2-19 units", "20+ units", "Mobile Home/Other")
-    ))
-  
+                                  levels=c("Single Family","2-19 units", "20+ units", "Mobile Home/Other"))) %>%
+    mutate(building_size_3=factor(case_when(grepl("_014$", variable) ~ "Single Family",
+                                            grepl("_015$|_016$|_017$|_018$", variable) ~ "2-9 units",
+                                            grepl("_019$|_020$|_021$", variable) ~ "10+ units",
+                                            grepl("_022$|_023$", variable) ~ "Mobile Home/Other",
+                                            TRUE ~ NA_character_),
+                                  levels=c("Single Family","2-9 units", "10+ units", "Mobile Home/Other")))
+
   #--------------------Aggregate data, incorporate 2-19 Unit group------------------------
   
   # In this step, you create an aggregate, using the grouping you created in the last call.
@@ -128,15 +145,22 @@ create_uis_renter_summary_table <- function(year) {
     group_by(across(c(name, year, building_size))) %>% 
     summarize(estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE))
   
-  # In this step, you create an aggregate, using the second grouping you created.
+  # In this step, you create an aggregate, using the 2-9 grouping
   uis_agg_renter_02 <- uis_coded %>%
     group_by(across(c(name, year, building_size_2))) %>%
     summarize(estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE)) %>% 
     filter(building_size_2 == '2-19 units') %>% 
     rename(building_size = building_size_2)
   
+  # In this step, you create an aggregate, using the 2-9 grouping
+  uis_agg_renter_03 <- uis_coded %>%
+    group_by(across(c(name, year, building_size_3))) %>%
+    summarize(estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE)) %>% 
+    filter(building_size_3 == '2-9 units') %>% 
+    rename(building_size = building_size_3)
+  
   df <- uis_agg_renter_01 %>% 
-    bind_rows(uis_agg_renter_02)
+    bind_rows(list(uis_agg_renter_02,uis_agg_renter_03))
   
 }
 
@@ -149,7 +173,7 @@ all_renter_tables <- map(years, ~create_uis_renter_summary_table(.x)) %>%
 
 uis_renter <- all_renter_tables %>% 
   mutate(building_size = factor(building_size,
-                                levels = c('Single Family', '2-4 units', '5-19 units', '2-19 units', '20+ units', 'Mobile Home/Other'))) %>% 
+                                levels = c('Single Family', '2-4 units', '2-9 units', '5-19 units', '2-19 units', '20+ units', 'Mobile Home/Other'))) %>% 
   arrange(year, name, building_size) %>% 
   filter(building_size != is.na(building_size))
 
