@@ -65,12 +65,15 @@ rcb_re_all <- map(years, ~rcb_re_func(.x)) %>%
 library(psrcplot)
 library(ggplot2)
 
-rcb_re_severe_cb <- interactive_line_chart(rcb_re_all, "DATA_YEAR", "share_Greater than 50 percent", fill = "PRACE",
-                                  title="Change in Severe Cost Burden by Race/Ethnicity (50%+ of income)",color="pgnobgy_5")
+rcb_re_all <- rcb_re_all %>%
+  mutate(DATA_YEAR_yr=format(DATA_YEAR,format="%Y"))
+
+rcb_re_severe_cb <- static_line_chart(rcb_re_all, "DATA_YEAR_yr", "share_Greater than 50 percent", fill = "PRACE",
+                                  title="Change in Severe Cost Burden by Race/Ethnicity (50%+ of income)",color="pgnobgy_10")
 rcb_re_severe_cb
 
-rcb_re_cb <- interactive_line_chart(rcb_re_all, "DATA_YEAR", "share_Between 30 and 50 percent", fill = "PRACE",
-                                       title="Change in Cost Burden by Race/Ethnicity (30-50% of income)",color="pgnobgy_5")
+rcb_re_cb <- static_line_chart(rcb_re_all, "DATA_YEAR", "share_Between 30 and 50 percent", fill = "PRACE",
+                                       title="Change in Cost Burden by Race/Ethnicity (30-50% of income)",color="pgnobgy_10")
 rcb_re_cb
 
 # ----------------------------- SUMMARIZE BY INCOME CATEGORY -----------------------------
@@ -135,12 +138,12 @@ library(ggplot2)
 
 # Removes NA rows - ensures the chart works correctly
 rcb_inc_all_chart <- rcb_inc_all[!is.na(rcb_inc_all$`Greater than 50 percent`),]
-rcb_inc_severe_cb <- interactive_line_chart(t=rcb_inc_all_chart,x="DATA_YEAR",y="share_Greater than 50 percent", fill="income_bin",
-                                          title="Change in Severe Cost Burden by Income (50%+ of income)",color="pgnobgy_5")
+rcb_inc_severe_cb <- static_line_chart(t=rcb_inc_all_chart,x="DATA_YEAR",y="share_Greater than 50 percent", fill="income_bin",
+                                          title="Change in Severe Cost Burden by Income (50%+ of income)",color="pgnobgy_10")
 rcb_inc_severe_cb
 
-rcb_inc_cb <- interactive_line_chart(rcb_inc_all_chart, "DATA_YEAR", "share_Between 30 and 50 percent", fill = "income_bin",
-                                   title="Change in Cost Burden by Income (30-50% of income)",color="pgnobgy_5")
+rcb_inc_cb <- static_line_chart(rcb_inc_all_chart, "DATA_YEAR", "share_Between 30 and 50 percent", fill = "income_bin",
+                                   title="Change in Cost Burden by Income (30-50% of income)",color="pgnobgy_10")
 rcb_inc_cb
 
 # Exporting tables------------

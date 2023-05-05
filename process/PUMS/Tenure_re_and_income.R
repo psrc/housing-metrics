@@ -66,6 +66,11 @@ tenure_re_func <- function(year){
 tenure_re_piv_all <- map(years, ~tenure_re_func(.x)) %>%
   reduce(bind_rows)
 
+# Prep for graphs -----------
+
+
+
+
 # Graph ownership over time -----------
 library(psrcplot)
 library(ggplot2)
@@ -73,6 +78,10 @@ library(ggplot2)
 ownership_re <- interactive_line_chart(tenure_re_piv_all, "DATA_YEAR", "share_owner", fill = "PRACE",
                                            title="Change in Ownership by Race/Ethnicity",color="pognbgy_10")
 ownership_re
+
+# Draft code for bar charts - percent tenure by RE
+# tenure_re <- static_bar_chart(tenure_re_piv_all, "tenure", "perc_tenure", pos = "stack", column_vs_bar = "bar", color = "pgnobgy_10")
+# tenure_re
 
 #-------------- Group by Tenure (ownership), Income, R/E Category --------------
 
