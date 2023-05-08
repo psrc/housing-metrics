@@ -1,7 +1,7 @@
 # TITLE: Affordable Rental Housing by Tract - for each R/E Category
 # GEOGRAPHIES: PSRC Region & Census Tract
 # DATA SOURCE: 5YR ACS Data
-# LAST EDITED: 5.4.2023
+# LAST EDITED: 5.8.2023
 # AUTHOR: Eric Clute
 
 library(psrccensus)
@@ -9,7 +9,7 @@ library(tidyverse)
 library(dplyr)
 library(srvyr)
 
-year <- (2017)
+year <- (2021)
 setwd("C:/Users/eclute/Downloads")
 
 #------------ Collect Median Gross Rent by Tract ------------
@@ -73,10 +73,10 @@ grossrent$affordable_white <- ifelse(incbyre_piv$White >= grossrent$grossrent, 1
 #-------------- Summary of census tracts affordable to each RE category -------------
 
 summarytbl <- data.frame(year)
-summarytbl$affordable_asian <- sum(na.omit(grossrent$affordable_asian))/nrow(grossrent)
-summarytbl$affordable_black <- sum(na.omit(grossrent$affordable_black))/nrow(grossrent)
-summarytbl$affordable_hispanic <- sum(na.omit(grossrent$affordable_hispanic))/nrow(grossrent)
-summarytbl$affordable_white <- sum(na.omit(grossrent$affordable_white))/nrow(grossrent)
+summarytbl$affordable_asian <- sum(na.omit(grossrent$affordable_asian))/nrow(na.omit(grossrent))
+summarytbl$affordable_black <- sum(na.omit(grossrent$affordable_black))/nrow(na.omit(grossrent))
+summarytbl$affordable_hispanic <- sum(na.omit(grossrent$affordable_hispanic))/nrow(na.omit(grossrent))
+summarytbl$affordable_white <- sum(na.omit(grossrent$affordable_white))/nrow(na.omit(grossrent))
 
 #-------------- Write to Excel --------------
 setwd("J:/Projects/V2050/Housing/Monitoring/2023Update")
