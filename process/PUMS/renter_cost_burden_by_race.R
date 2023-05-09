@@ -1,7 +1,7 @@
 # TITLE: Renter Cost Burden by Race
 # GEOGRAPHIES: PSRC Region
 # DATA SOURCE: ACS PUMS 5YR
-# DATE MODIFIED: 5.02.2023
+# DATE MODIFIED: 5.09.2023
 # AUTHOR: Eric Clute
 
 library(magrittr)
@@ -10,6 +10,7 @@ library(dplyr)
 library(srvyr)
 library(tidyr)
 library(purrr)
+library(fredr)
 
 years <- c(2010, 2016, 2021)
 
@@ -65,10 +66,7 @@ rcb_re_all <- map(years, ~rcb_re_func(.x)) %>%
 library(psrcplot)
 library(ggplot2)
 
-rcb_re_all <- rcb_re_all %>%
-  mutate(DATA_YEAR_yr=format(DATA_YEAR,format="%Y"))
-
-rcb_re_severe_cb <- static_line_chart(rcb_re_all, "DATA_YEAR_yr", "share_Greater than 50 percent", fill = "PRACE",
+rcb_re_severe_cb <- static_line_chart(rcb_re_all, "DATA_YEAR", "share_Greater than 50 percent", fill = "PRACE",
                                   title="Change in Severe Cost Burden by Race/Ethnicity (50%+ of income)",color="pgnobgy_10")
 rcb_re_severe_cb
 
@@ -85,16 +83,19 @@ rcb_inc_func <- function(year){
   setwd("J:/Projects/V2050/Housing/Monitoring/2023Update")
   rcb <- rcb_raw
   
+  # Adjust for inflation
+  rcb <- real_dollars(rcb, 2021)
+  
   # Filter to only renters, create income/rent burden groupings, rename race/ethnicity categories, combine Some other Race & Two or More Races
   rcb <- rcb %>% filter(TEN=="Rented") %>%
     mutate(
-      income_bin=factor(case_when(HINCP < 25000 ~ "Under $25,000",
-                                  HINCP < 35000 ~ "$25,000-$34,999",
-                                  HINCP < 50000 ~ "$35,000-$49,999",
-                                  HINCP < 75000 ~ "$50,000-$74,999",
-                                  HINCP < 100000 ~ "$75,000-$99,999",
-                                  HINCP >=100000 ~ "$100,000 or more",
-                                  !is.na(HINCP) ~ "Else / Prefer not to answer"),
+      income_bin=factor(case_when(HINCP2021 < 25000 ~ "Under $25,000",
+                                  HINCP2021 < 35000 ~ "$25,000-$34,999",
+                                  HINCP2021 < 50000 ~ "$35,000-$49,999",
+                                  HINCP2021 < 75000 ~ "$50,000-$74,999",
+                                  HINCP2021 < 100000 ~ "$75,000-$99,999",
+                                  HINCP2021 >=100000 ~ "$100,000 or more",
+                                  !is.na(HINCP2021) ~ "Else / Prefer not to answer"),
                         levels=c("Under $25,000",
                                  "$25,000-$34,999",                                     
                                  "$35,000-$49,999",
