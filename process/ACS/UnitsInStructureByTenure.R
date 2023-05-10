@@ -186,7 +186,7 @@ calc_share_growth <- function(table) {
   
   # calculate totals in new dataframe
   totals <- table %>% 
-    filter(building_size != '2-19 units') %>% 
+    filter(!(building_size %in% c('2-9 units', '2-19 units'))) %>%
     group_by(name, year) %>% 
     summarise(total = sum(estimate))
   
