@@ -1,7 +1,7 @@
 # TITLE: Units in Structure by Tenure
 # GEOGRAPHIES: PSRC Region & County
 # DATA SOURCE: 5YR ACS Data 2006-2010 and 2017-2021
-# LAST EDITED: 5.05.2023
+# LAST EDITED: 5.11.2023
 # AUTHOR: Eric Clute & Christy Lam
 
 library(psrccensus)
@@ -10,7 +10,7 @@ library(tidycensus)
 library(tidyverse)
 
 # years of interest (applies to all functions below)
-years <- c(2010,2016,2021)
+years <- c(2010,2021)
 
 #---------------------OWNER OCCUPIED UNITS----------------------
 
@@ -44,12 +44,13 @@ create_uis_owner_summary_table <- function(year) {
                                   levels=c("Single Family","2-19 units", "20+ units", "Mobile Home/Other"))) %>%
     mutate(building_size_3=factor(case_when(grepl("_003$", variable) ~ "Single Family",
                                             grepl("_004$|_005$|_006$|_007$", variable) ~ "2-9 units",
-                                            grepl("_008$|_009$|_010$", variable) ~ "10+ units",
+                                            grepl("_008$", variable) ~ "10-19 units",
+                                            grepl("_009$|_010$", variable) ~ "20+ units",
                                             grepl("_011$|_012$", variable) ~ "Mobile Home/Other",
                                             TRUE ~ NA_character_),
-                                  levels=c("Single Family","2-9 units", "10+ units", "Mobile Home/Other")))
+                                  levels=c("Single Family","2-9 units", "10-19 units","20+ units" , "Mobile Home/Other")))
   
-  #--------------------Aggregate data, incorporate 2-19 Unit group and 2-9 Unit group ------------------------
+  #--------------------Aggregate data, incorporate 2-19 Unit group, 2-9 Unit group, and 10-19 unit group ------------------------
   
   # In this step, you create an aggregate, using the grouping you created in the last call.
   uis_agg_owner <- summarize(uis_raw, estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE)) 
@@ -71,7 +72,7 @@ create_uis_owner_summary_table <- function(year) {
   uis_agg_owner_03 <- uis_coded %>%
     group_by(across(c(name, year, building_size_3))) %>%
     summarize(estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE)) %>% 
-    filter(building_size_3 == '2-9 units') %>% 
+    filter(building_size_3 == '2-9 units'| building_size_3 == '10-19 units') %>% 
     rename(building_size = building_size_3)
   
   df <- uis_agg_owner_01 %>% 
@@ -90,7 +91,7 @@ all_owner_tables <- map(years, ~create_uis_owner_summary_table(.x)) %>%
 
 uis_owner <- all_owner_tables %>% 
   mutate(building_size = factor(building_size,
-                                levels = c('Single Family', '2-4 units', '2-9 units', '5-19 units', '2-19 units', '20+ units', 'Mobile Home/Other'))) %>% 
+                                levels = c('Single Family', '2-4 units', '2-9 units', '5-19 units', '2-19 units', "10-19 units", '20+ units', 'Mobile Home/Other'))) %>% 
   arrange(year, name, building_size) %>% 
   filter(building_size != is.na(building_size))
 
@@ -129,10 +130,11 @@ create_uis_renter_summary_table <- function(year) {
                                   levels=c("Single Family","2-19 units", "20+ units", "Mobile Home/Other"))) %>%
     mutate(building_size_3=factor(case_when(grepl("_014$", variable) ~ "Single Family",
                                             grepl("_015$|_016$|_017$|_018$", variable) ~ "2-9 units",
-                                            grepl("_019$|_020$|_021$", variable) ~ "10+ units",
+                                            grepl("_019$", variable) ~ "10-19 units",
+                                            grepl("_020$|_021$", variable) ~ "20+ units",
                                             grepl("_022$|_023$", variable) ~ "Mobile Home/Other",
                                             TRUE ~ NA_character_),
-                                  levels=c("Single Family","2-9 units", "10+ units", "Mobile Home/Other")))
+                                  levels=c("Single Family","2-9 units","10-19 units", "20+ units", "Mobile Home/Other")))
 
   #--------------------Aggregate data, incorporate 2-19 Unit group------------------------
   
@@ -156,7 +158,7 @@ create_uis_renter_summary_table <- function(year) {
   uis_agg_renter_03 <- uis_coded %>%
     group_by(across(c(name, year, building_size_3))) %>%
     summarize(estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE)) %>% 
-    filter(building_size_3 == '2-9 units') %>% 
+    filter(building_size_3 == '2-9 units'| building_size_3 == '10-19 units') %>% 
     rename(building_size = building_size_3)
   
   df <- uis_agg_renter_01 %>% 
@@ -173,7 +175,7 @@ all_renter_tables <- map(years, ~create_uis_renter_summary_table(.x)) %>%
 
 uis_renter <- all_renter_tables %>% 
   mutate(building_size = factor(building_size,
-                                levels = c('Single Family', '2-4 units', '2-9 units', '5-19 units', '2-19 units', '20+ units', 'Mobile Home/Other'))) %>% 
+                                levels = c('Single Family', '2-4 units', '2-9 units', '5-19 units', '2-19 units', "10-19 units", '20+ units', 'Mobile Home/Other'))) %>% 
   arrange(year, name, building_size) %>% 
   filter(building_size != is.na(building_size))
 
@@ -186,7 +188,7 @@ calc_share_growth <- function(table) {
   
   # calculate totals in new dataframe
   totals <- table %>% 
-    filter(!(building_size %in% c('2-9 units', '2-19 units'))) %>%
+    filter(!(building_size %in% c('2-9 units', '2-19 units','10-19 units'))) %>%
     group_by(name, year) %>% 
     summarise(total = sum(estimate))
   
@@ -240,7 +242,6 @@ share_cols_renter <- str_which(colnames(df_uis_renter_wide), 'share')
 
 # Add RR scores
 df_uis_owner_wide$rr_score_2010 <- (df_uis_owner_wide$moe_2010/1.645)/df_uis_owner_wide$estimate_2010*100
-df_uis_owner_wide$rr_score_2016 <- (df_uis_owner_wide$moe_2016/1.645)/df_uis_owner_wide$estimate_2016*100
 df_uis_owner_wide$rr_score_2021 <- (df_uis_owner_wide$moe_2021/1.645)/df_uis_owner_wide$estimate_2021*100
 df_uis_owner_wide <- df_uis_owner_wide %>%
   mutate(rr_score_2010=factor(case_when(rr_score_2010 <= 15 ~"good",
@@ -248,11 +249,6 @@ df_uis_owner_wide <- df_uis_owner_wide %>%
                                         rr_score_2010 <= 50 ~"weak",
                                         rr_score_2010 > 50 ~"unreliable",
                                        !is.na(rr_score_2010) ~ NA)),
-         rr_score_2016=factor(case_when(rr_score_2016 <= 15 ~"good",
-                                        rr_score_2016 <= 30 ~"fair",
-                                        rr_score_2016 <= 50 ~"weak",
-                                        rr_score_2016 > 50 ~"unreliable",
-                                        !is.na(rr_score_2010) ~ NA)),
          rr_score_2021=factor(case_when(rr_score_2021 <= 15 ~"good",
                                         rr_score_2021 <= 30 ~"fair",
                                         rr_score_2021 <= 50 ~"weak",
@@ -260,7 +256,6 @@ df_uis_owner_wide <- df_uis_owner_wide %>%
                                         !is.na(rr_score_2021) ~ NA)))
 
 df_uis_renter_wide$rr_score_2010 <- (df_uis_renter_wide$moe_2010/1.645)/df_uis_renter_wide$estimate_2010*100
-df_uis_renter_wide$rr_score_2016 <- (df_uis_renter_wide$moe_2016/1.645)/df_uis_renter_wide$estimate_2016*100
 df_uis_renter_wide$rr_score_2021 <- (df_uis_renter_wide$moe_2021/1.645)/df_uis_renter_wide$estimate_2021*100
 df_uis_renter_wide <- df_uis_renter_wide %>%
   mutate(rr_score_2010=factor(case_when(rr_score_2010 <= 15 ~"good",
@@ -268,18 +263,13 @@ df_uis_renter_wide <- df_uis_renter_wide %>%
                                         rr_score_2010 <= 50 ~"weak",
                                         rr_score_2010 > 50 ~"unreliable",
                                         !is.na(rr_score_2010) ~ NA)),
-         rr_score_2016=factor(case_when(rr_score_2016 <= 15 ~"good",
-                                        rr_score_2016 <= 30 ~"fair",
-                                        rr_score_2016 <= 50 ~"weak",
-                                        rr_score_2016 > 50 ~"unreliable",
-                                        !is.na(rr_score_2010) ~ NA)),
          rr_score_2021=factor(case_when(rr_score_2021 <= 15 ~"good",
                                         rr_score_2021 <= 30 ~"fair",
                                         rr_score_2021 <= 50 ~"weak",
                                         rr_score_2021 > 50 ~"unreliable",
                                         !is.na(rr_score_2021) ~ NA)))
 
-#------------------------Export for Excel------------------------
+#------------------------Export tables for Excel------------------------
 
 work_book <- createWorkbook()
 addWorksheet(work_book, sheetName = "Owners 5YR ACS")
@@ -296,3 +286,5 @@ addStyle(work_book, "Renters 5YR ACS", style=pct, cols=share_cols_renter, rows=2
 
 setwd("J:/Projects/V2050/Housing/Monitoring/2023Update")
 saveWorkbook(work_book, file = "Units In Structure by Tenure/r_output.xlsx", overwrite = TRUE)
+
+
