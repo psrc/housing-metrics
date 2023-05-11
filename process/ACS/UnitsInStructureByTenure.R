@@ -10,7 +10,7 @@ library(tidycensus)
 library(tidyverse)
 
 # years of interest (applies to all functions below)
-years <- c(2010,2021)
+years <- c(2010,2016,2021)
 
 #---------------------OWNER OCCUPIED UNITS----------------------
 
@@ -240,6 +240,7 @@ share_cols_renter <- str_which(colnames(df_uis_renter_wide), 'share')
 
 # Add RR scores
 df_uis_owner_wide$rr_score_2010 <- (df_uis_owner_wide$moe_2010/1.645)/df_uis_owner_wide$estimate_2010*100
+df_uis_owner_wide$rr_score_2016 <- (df_uis_owner_wide$moe_2016/1.645)/df_uis_owner_wide$estimate_2016*100
 df_uis_owner_wide$rr_score_2021 <- (df_uis_owner_wide$moe_2021/1.645)/df_uis_owner_wide$estimate_2021*100
 df_uis_owner_wide <- df_uis_owner_wide %>%
   mutate(rr_score_2010=factor(case_when(rr_score_2010 <= 15 ~"good",
@@ -247,6 +248,11 @@ df_uis_owner_wide <- df_uis_owner_wide %>%
                                         rr_score_2010 <= 50 ~"weak",
                                         rr_score_2010 > 50 ~"unreliable",
                                        !is.na(rr_score_2010) ~ NA)),
+         rr_score_2016=factor(case_when(rr_score_2016 <= 15 ~"good",
+                                        rr_score_2016 <= 30 ~"fair",
+                                        rr_score_2016 <= 50 ~"weak",
+                                        rr_score_2016 > 50 ~"unreliable",
+                                        !is.na(rr_score_2010) ~ NA)),
          rr_score_2021=factor(case_when(rr_score_2021 <= 15 ~"good",
                                         rr_score_2021 <= 30 ~"fair",
                                         rr_score_2021 <= 50 ~"weak",
@@ -254,12 +260,18 @@ df_uis_owner_wide <- df_uis_owner_wide %>%
                                         !is.na(rr_score_2021) ~ NA)))
 
 df_uis_renter_wide$rr_score_2010 <- (df_uis_renter_wide$moe_2010/1.645)/df_uis_renter_wide$estimate_2010*100
+df_uis_renter_wide$rr_score_2016 <- (df_uis_renter_wide$moe_2016/1.645)/df_uis_renter_wide$estimate_2016*100
 df_uis_renter_wide$rr_score_2021 <- (df_uis_renter_wide$moe_2021/1.645)/df_uis_renter_wide$estimate_2021*100
 df_uis_renter_wide <- df_uis_renter_wide %>%
   mutate(rr_score_2010=factor(case_when(rr_score_2010 <= 15 ~"good",
                                         rr_score_2010 <= 30 ~"fair",
                                         rr_score_2010 <= 50 ~"weak",
                                         rr_score_2010 > 50 ~"unreliable",
+                                        !is.na(rr_score_2010) ~ NA)),
+         rr_score_2016=factor(case_when(rr_score_2016 <= 15 ~"good",
+                                        rr_score_2016 <= 30 ~"fair",
+                                        rr_score_2016 <= 50 ~"weak",
+                                        rr_score_2016 > 50 ~"unreliable",
                                         !is.na(rr_score_2010) ~ NA)),
          rr_score_2021=factor(case_when(rr_score_2021 <= 15 ~"good",
                                         rr_score_2021 <= 30 ~"fair",
