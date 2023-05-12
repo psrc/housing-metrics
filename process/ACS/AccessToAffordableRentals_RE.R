@@ -1,7 +1,7 @@
 # TITLE: Affordable Rental Housing by Tract - for each R/E Category
 # GEOGRAPHIES: PSRC Region & Census Tract
 # DATA SOURCE: 5YR ACS Data
-# LAST EDITED: 5.8.2023
+# LAST EDITED: 5.12.2023
 # AUTHOR: Eric Clute
 
 library(psrccensus)
@@ -9,7 +9,7 @@ library(tidyverse)
 library(dplyr)
 library(srvyr)
 
-year <- (2021)
+year <- (2010)
 setwd("C:/Users/eclute/Downloads")
 
 #------------ Collect Median Gross Rent by Tract ------------
@@ -20,10 +20,11 @@ DP04Table_raw <- get_acs_recs(geography = 'tract',
                            acs.type = 'acs5')
 
 grossrent <- DP04Table_raw %>%
-  filter(variable == "DP04_0134") %>%
+  filter(ifelse(year >= '2015', variable == "DP04_0134", variable == "DP04_0132")) %>% #variable change beginning in 2015
   mutate(.keep = "none",
          DATA_YEAR = year,
          geoid = GEOID,
+         variable = variable,
          grossrent = estimate,
          grossrent_moe = moe)
 
