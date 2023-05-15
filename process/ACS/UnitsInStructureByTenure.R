@@ -1,7 +1,7 @@
 # TITLE: Units in Structure by Tenure
 # GEOGRAPHIES: PSRC Region & County
 # DATA SOURCE: 5YR ACS Data 2006-2010 and 2017-2021
-# LAST EDITED: 5.11.2023
+# LAST EDITED: 5.15.2023
 # AUTHOR: Eric Clute & Christy Lam
 
 library(psrccensus)
@@ -270,7 +270,6 @@ df_uis_renter_wide <- df_uis_renter_wide %>%
                                         !is.na(rr_score_2021) ~ NA)))
 
 #------------------------Export tables for Excel------------------------
-
 work_book <- createWorkbook()
 addWorksheet(work_book, sheetName = "Owners 5YR ACS")
 addWorksheet(work_book, sheetName = "Renters 5YR ACS")
@@ -287,4 +286,75 @@ addStyle(work_book, "Renters 5YR ACS", style=pct, cols=share_cols_renter, rows=2
 setwd("J:/Projects/V2050/Housing/Monitoring/2023Update")
 saveWorkbook(work_book, file = "Units In Structure by Tenure/r_output.xlsx", overwrite = TRUE)
 
+#------------------------Comparisons Over Time (moderate density)------------------------
+compared_years <- c(2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021)
 
+create_uis_renter_compare <- function(compared_year) {
+  
+  #---------------------Grab data from Census API
+  
+  uis_raw<-get_acs_recs(geography = 'county',
+                        table.names = c('B25032'),
+                        years = compared_year,
+                        counties = c("King", "Kitsap", "Pierce", "Snohomish"),
+                        acs.type = 'acs5')
+  
+  #---------------------Create custom groupings
+  
+  # The next step is to create the appropriate grouping variable (using pipes for simplicity)
+  
+  uis_coded <- uis_raw %>% 
+    mutate(building_size=factor(case_when(grepl("_014$", variable) ~ "Single Family",
+                                            grepl("_015$|_016$|_017$|_018$", variable) ~ "2-9 units",
+                                            grepl("_019$", variable) ~ "10-19 units",
+                                            grepl("_020$|_021$", variable) ~ "20+ units",
+                                            grepl("_022$|_023$", variable) ~ "Mobile Home/Other",
+                                            TRUE ~ NA_character_),
+                                  levels=c("Single Family","2-9 units","10-19 units", "20+ units", "Mobile Home/Other")))
+  
+  #--------------------Aggregate data
+  
+  # In this step, you create an aggregate, using the grouping you created in the last call.
+  uis_agg_renter <- summarize(uis_raw, estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE)) 
+  
+  
+  # In this step, you create an aggregate, using the first grouping you created in the last call.
+  uis_agg_renter_01 <- uis_coded %>% 
+    group_by(across(c(name, year, building_size))) %>% 
+    summarize(estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE))
+  
+}
+
+#---------------------Summarize data into one table, sort by building size
+
+# iterate thru each year in the function, stored a list. Combine lists and order output by building size category
+
+all_renter_compare <- map(compared_years, ~create_uis_renter_compare(.x)) %>% 
+  reduce(bind_rows)
+
+all_renter_compare <- all_renter_compare %>% 
+  mutate(building_size = factor(building_size,
+                                levels = c('Single Family', '2-9 units', "10-19 units", '20+ units', 'Mobile Home/Other'))) %>% 
+  arrange(year, name, building_size) %>% 
+  filter(building_size != is.na(building_size))
+
+#---------------------Chart out moderate density units, per county, over time
+library(psrcplot)
+library(ggplot2)
+
+moderate_density <- all_renter_compare %>%
+  filter(building_size == '10-19 units') %>%
+  ungroup()
+
+mod_density_chart <- interactive_line_chart(moderate_density, "year", "estimate", fill = "name",
+                                title="Change in Moderate Density Units (10-19)",color="pgnobgy_10")
+mod_density_chart
+
+#---------------------Chart out middle density units, per county, over time
+middle_density <- all_renter_compare %>%
+  filter(building_size == '2-9 units') %>%
+  ungroup()
+
+mid_density_chart <- interactive_line_chart(middle_density, "year", "estimate", fill = "name",
+                                            title="Change in Middle Density Units (2-9)",color="pgnobgy_10")
+mid_density_chart
