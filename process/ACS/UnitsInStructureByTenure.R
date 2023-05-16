@@ -332,29 +332,63 @@ create_uis_renter_compare <- function(compared_year) {
 all_renter_compare <- map(compared_years, ~create_uis_renter_compare(.x)) %>% 
   reduce(bind_rows)
 
+all_renter_compare$rr_score <- (all_renter_compare$moe/1.645)/all_renter_compare$estimate*100
+
 all_renter_compare <- all_renter_compare %>% 
   mutate(building_size = factor(building_size,
-                                levels = c('Single Family', '2-9 units', "10-19 units", '20+ units', 'Mobile Home/Other'))) %>% 
+                                levels = c('Single Family', '2-9 units', "10-19 units", '20+ units', 'Mobile Home/Other')),
+         rr_score=factor(case_when(rr_score <= 15 ~"good",
+                               rr_score <= 30 ~"fair",
+                               rr_score <= 50 ~"weak",
+                               rr_score > 50 ~"unreliable",
+                               !is.na(rr_score) ~ NA))) %>% 
   arrange(year, name, building_size) %>% 
   filter(building_size != is.na(building_size))
 
-#---------------------Chart out moderate density units, per county, over time
+#---------------------Chart by density of units, per county, over time (should not compare overlapping 5 YR estimates!!)
 library(psrcplot)
 library(ggplot2)
 
-moderate_density <- all_renter_compare %>%
-  filter(building_size == '10-19 units') %>%
-  ungroup()
-
-mod_density_chart <- interactive_line_chart(moderate_density, "year", "estimate", fill = "name",
-                                title="Change in Moderate Density Units (10-19)",color="pgnobgy_10")
-mod_density_chart
-
-#---------------------Chart out middle density units, per county, over time
 middle_density <- all_renter_compare %>%
   filter(building_size == '2-9 units') %>%
   ungroup()
 
 mid_density_chart <- interactive_line_chart(middle_density, "year", "estimate", fill = "name",
-                                            title="Change in Middle Density Units (2-9)",color="pgnobgy_10")
+                                            title="Middle Density Renter Units (2-9)",color="pgnobgy_10")
 mid_density_chart
+
+#---------------------Chart out moderate density units, per county, over time
+moderate_density <- all_renter_compare %>%
+  filter(building_size == '10-19 units') %>%
+  ungroup()
+
+mod_density_chart <- interactive_line_chart(moderate_density, "year", "estimate", fill = "name",
+                                title="Moderate Density Renter Units (10-19)",color="pgnobgy_10")
+mod_density_chart
+
+#---------------------Chart out high density units, per county, over time
+high_density <- all_renter_compare %>%
+  filter(building_size == '20+ units') %>%
+  ungroup()
+
+high_density_chart <- interactive_line_chart(high_density, "year", "estimate", fill = "name",
+                                            title="High Density Renter Units (20+)",color="pgnobgy_10")
+high_density_chart
+
+#---------------------Chart out single family units, per county, over time
+single_family <- all_renter_compare %>%
+  filter(building_size == 'Single Family') %>%
+  ungroup()
+
+single_family_chart <- interactive_line_chart(single_family, "year", "estimate", fill = "name",
+                                             title="Single Family Renter Units",color="pgnobgy_10")
+single_family_chart
+
+#---------------------Chart out mobile home/other units, per county, over time
+mh_other <- all_renter_compare %>%
+  filter(building_size == 'Mobile Home/Other') %>%
+  ungroup()
+
+mh_other_chart <- interactive_line_chart(mh_other, "year", "estimate", fill = "name",
+                                              title="Mobile Home/Other Renter Units",color="pgnobgy_10")
+mh_other_chart
