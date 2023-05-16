@@ -1,7 +1,7 @@
 # TITLE: Units in Structure by Tenure
 # GEOGRAPHIES: PSRC Region & County
-# DATA SOURCE: 5YR ACS Data 2006-2010 and 2017-2021
-# LAST EDITED: 5.15.2023
+# DATA SOURCE: 5YR ACS Data
+# LAST EDITED: 5.16.2023
 # AUTHOR: Eric Clute & Christy Lam
 
 library(psrccensus)
@@ -286,34 +286,134 @@ addStyle(work_book, "Renters 5YR ACS", style=pct, cols=share_cols_renter, rows=2
 setwd("J:/Projects/V2050/Housing/Monitoring/2023Update")
 saveWorkbook(work_book, file = "Units In Structure by Tenure/r_output.xlsx", overwrite = TRUE)
 
-#------------------------Comparisons Over Time (moderate density)------------------------
-compared_years <- c(2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021)
+#------------------------COMPARISONS OVER TIME------------------------
+compared_years <- c(2010,2016,2021)
 
-create_uis_renter_compare <- function(compared_year) {
+# All Occupied Units----------------------
+create_uis_compare <- function(compared_year) {
   
-  #---------------------Grab data from Census API
-  
+  # Grab data from Census API
   uis_raw<-get_acs_recs(geography = 'county',
                         table.names = c('B25032'),
                         years = compared_year,
                         counties = c("King", "Kitsap", "Pierce", "Snohomish"),
                         acs.type = 'acs5')
   
-  #---------------------Create custom groupings
+  # Create custom groupings
+  # The next step is to create the appropriate grouping variable (using pipes for simplicity)
   
+  uis_coded <- uis_raw %>% 
+    mutate(building_size=factor(case_when(grepl("_003$|_014$", variable) ~ "Single Family",
+                                            grepl("_004$|_005$|_006$|_007$|_015$|_016$|_017$|_018$", variable) ~ "2-9 units",
+                                            grepl("_008$|_019$", variable) ~ "10-19 units",
+                                            grepl("_009$|_010$|_020$|_021$", variable) ~ "20+ units",
+                                            grepl("_011$|_012$|_022$|_023$", variable) ~ "Mobile Home/Other",
+                                            TRUE ~ NA_character_),
+                                  levels=c("Single Family","2-9 units","10-19 units", "20+ units", "Mobile Home/Other")))
+  
+  # Aggregate data
+  # In this step, you create an aggregate, using the grouping you created in the last call.
+  uis_agg <- summarize(uis_raw, estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE)) 
+  
+  
+  # In this step, you create an aggregate, using the first grouping you created in the last call.
+  uis_agg_01 <- uis_coded %>% 
+    group_by(across(c(name, year, building_size))) %>% 
+    summarize(estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE))
+  
+}
+
+# Summarize data into one table, sort by building size
+# iterate thru each year in the function, stored a list. Combine lists and order output by building size category
+
+all_compare <- map(compared_years, ~create_uis_compare(.x)) %>% 
+  reduce(bind_rows)
+
+all_compare$rr_score <- (all_compare$moe/1.645)/all_compare$estimate*100
+
+all_compare <- all_compare %>% 
+  mutate(building_size = factor(building_size,
+                                levels = c('Single Family', '2-9 units', "10-19 units", '20+ units', 'Mobile Home/Other')),
+         rr_score=factor(case_when(rr_score <= 15 ~"good",
+                               rr_score <= 30 ~"fair",
+                               rr_score <= 50 ~"weak",
+                               rr_score > 50 ~"unreliable",
+                               !is.na(rr_score) ~ NA))) %>% 
+  arrange(year, name, building_size) %>% 
+  filter(building_size != is.na(building_size))
+
+# Chart by density of units, per county, over time (should not compare overlapping 5 YR estimates!!)
+library(psrcplot)
+library(ggplot2)
+
+middle_density <- all_compare %>%
+  filter(building_size == '2-9 units') %>%
+  ungroup()
+
+mid_density_chart <- interactive_line_chart(middle_density, "year", "estimate", fill = "name",
+                                            title="Middle Density Units (2-9)",color="pgnobgy_10")
+mid_density_chart
+
+# Chart out moderate density units, per county, over time
+moderate_density <- all_compare %>%
+  filter(building_size == '10-19 units') %>%
+  ungroup()
+
+mod_density_chart <- interactive_line_chart(moderate_density, "year", "estimate", fill = "name",
+                                title="Moderate Density Units (10-19)",color="pgnobgy_10")
+mod_density_chart
+
+# Chart out high density units, per county, over time
+high_density <- all_compare %>%
+  filter(building_size == '20+ units') %>%
+  ungroup()
+
+high_density_chart <- interactive_line_chart(high_density, "year", "estimate", fill = "name",
+                                            title="High Density Units (20+)",color="pgnobgy_10")
+high_density_chart
+
+# Chart out single family units, per county, over time
+single_family <- all_compare %>%
+  filter(building_size == 'Single Family') %>%
+  ungroup()
+
+single_family_chart <- interactive_line_chart(single_family, "year", "estimate", fill = "name",
+                                             title="Single Family Units",color="pgnobgy_10")
+single_family_chart
+
+# Chart out mobile home/other units, per county, over time
+mh_other <- all_compare %>%
+  filter(building_size == 'Mobile Home/Other') %>%
+  ungroup()
+
+mh_other_chart <- interactive_line_chart(mh_other, "year", "estimate", fill = "name",
+                                              title="Mobile Home/Other Units",color="pgnobgy_10")
+mh_other_chart
+
+# Renter Occupied Units-----------------------
+
+create_uis_renter_compare <- function(compared_year) {
+  
+  # Grab data from Census API
+  uis_raw<-get_acs_recs(geography = 'county',
+                        table.names = c('B25032'),
+                        years = compared_year,
+                        counties = c("King", "Kitsap", "Pierce", "Snohomish"),
+                        acs.type = 'acs5')
+  
+  # Create custom groupings
   # The next step is to create the appropriate grouping variable (using pipes for simplicity)
   
   uis_coded <- uis_raw %>% 
     mutate(building_size=factor(case_when(grepl("_014$", variable) ~ "Single Family",
-                                            grepl("_015$|_016$|_017$|_018$", variable) ~ "2-9 units",
-                                            grepl("_019$", variable) ~ "10-19 units",
-                                            grepl("_020$|_021$", variable) ~ "20+ units",
-                                            grepl("_022$|_023$", variable) ~ "Mobile Home/Other",
-                                            TRUE ~ NA_character_),
-                                  levels=c("Single Family","2-9 units","10-19 units", "20+ units", "Mobile Home/Other")))
+                                          grepl("_015$|_016$|_017$|_018$", variable) ~ "2-9 units",
+                                          grepl("_019$", variable) ~ "10-19 units",
+                                          grepl("_020$|_021$", variable) ~ "20+ units",
+                                          grepl("_022$|_023$", variable) ~ "Mobile Home/Other",
+                                          TRUE ~ NA_character_),
+                                levels=c("Single Family","2-9 units","10-19 units", "20+ units", "Mobile Home/Other")))
   
-  #--------------------Aggregate data
-  
+  # Aggregate data
   # In this step, you create an aggregate, using the grouping you created in the last call.
   uis_agg_renter <- summarize(uis_raw, estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE)) 
   
@@ -325,8 +425,7 @@ create_uis_renter_compare <- function(compared_year) {
   
 }
 
-#---------------------Summarize data into one table, sort by building size
-
+# Summarize data into one table, sort by building size
 # iterate thru each year in the function, stored a list. Combine lists and order output by building size category
 
 all_renter_compare <- map(compared_years, ~create_uis_renter_compare(.x)) %>% 
@@ -338,14 +437,14 @@ all_renter_compare <- all_renter_compare %>%
   mutate(building_size = factor(building_size,
                                 levels = c('Single Family', '2-9 units', "10-19 units", '20+ units', 'Mobile Home/Other')),
          rr_score=factor(case_when(rr_score <= 15 ~"good",
-                               rr_score <= 30 ~"fair",
-                               rr_score <= 50 ~"weak",
-                               rr_score > 50 ~"unreliable",
-                               !is.na(rr_score) ~ NA))) %>% 
+                                   rr_score <= 30 ~"fair",
+                                   rr_score <= 50 ~"weak",
+                                   rr_score > 50 ~"unreliable",
+                                   !is.na(rr_score) ~ NA))) %>% 
   arrange(year, name, building_size) %>% 
   filter(building_size != is.na(building_size))
 
-#---------------------Chart by density of units, per county, over time (should not compare overlapping 5 YR estimates!!)
+# Chart by density of units, per county, over time (should not compare overlapping 5 YR estimates!!)
 library(psrcplot)
 library(ggplot2)
 
@@ -357,38 +456,141 @@ mid_density_chart <- interactive_line_chart(middle_density, "year", "estimate", 
                                             title="Middle Density Renter Units (2-9)",color="pgnobgy_10")
 mid_density_chart
 
-#---------------------Chart out moderate density units, per county, over time
+# Chart out moderate density units, per county, over time
 moderate_density <- all_renter_compare %>%
   filter(building_size == '10-19 units') %>%
   ungroup()
 
 mod_density_chart <- interactive_line_chart(moderate_density, "year", "estimate", fill = "name",
-                                title="Moderate Density Renter Units (10-19)",color="pgnobgy_10")
+                                            title="Moderate Density Renter Units (10-19)",color="pgnobgy_10")
 mod_density_chart
 
-#---------------------Chart out high density units, per county, over time
+# Chart out high density units, per county, over time
 high_density <- all_renter_compare %>%
   filter(building_size == '20+ units') %>%
   ungroup()
 
 high_density_chart <- interactive_line_chart(high_density, "year", "estimate", fill = "name",
-                                            title="High Density Renter Units (20+)",color="pgnobgy_10")
+                                             title="High Density Renter Units (20+)",color="pgnobgy_10")
 high_density_chart
 
-#---------------------Chart out single family units, per county, over time
+# Chart out single family units, per county, over time
 single_family <- all_renter_compare %>%
   filter(building_size == 'Single Family') %>%
   ungroup()
 
 single_family_chart <- interactive_line_chart(single_family, "year", "estimate", fill = "name",
-                                             title="Single Family Renter Units",color="pgnobgy_10")
+                                              title="Single Family Renter Units",color="pgnobgy_10")
 single_family_chart
 
-#---------------------Chart out mobile home/other units, per county, over time
+# Chart out mobile home/other units, per county, over time
 mh_other <- all_renter_compare %>%
   filter(building_size == 'Mobile Home/Other') %>%
   ungroup()
 
 mh_other_chart <- interactive_line_chart(mh_other, "year", "estimate", fill = "name",
-                                              title="Mobile Home/Other Renter Units",color="pgnobgy_10")
+                                         title="Mobile Home/Other Renter Units",color="pgnobgy_10")
+mh_other_chart
+
+
+# Owner Occupied Units-----------------------
+
+create_uis_owner_compare <- function(compared_year) {
+  
+  # Grab data from Census API
+  uis_raw<-get_acs_recs(geography = 'county',
+                        table.names = c('B25032'),
+                        years = compared_year,
+                        counties = c("King", "Kitsap", "Pierce", "Snohomish"),
+                        acs.type = 'acs5')
+  
+  # Create custom groupings
+  # The next step is to create the appropriate grouping variable (using pipes for simplicity)
+  
+  uis_coded <- uis_raw %>% 
+    mutate(building_size=factor(case_when(grepl("_003$", variable) ~ "Single Family",
+                                          grepl("_004$|_005$|_006$|_007$", variable) ~ "2-9 units",
+                                          grepl("_008$", variable) ~ "10-19 units",
+                                          grepl("_009$|_010$", variable) ~ "20+ units",
+                                          grepl("_011$|_012$", variable) ~ "Mobile Home/Other",
+                                          TRUE ~ NA_character_),
+                                levels=c("Single Family","2-9 units","10-19 units", "20+ units", "Mobile Home/Other")))
+  
+  # Aggregate data
+  # In this step, you create an aggregate, using the grouping you created in the last call.
+  uis_agg_owner <- summarize(uis_raw, estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE)) 
+  
+  
+  # In this step, you create an aggregate, using the first grouping you created in the last call.
+  uis_agg_owner_01 <- uis_coded %>% 
+    group_by(across(c(name, year, building_size))) %>% 
+    summarize(estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE))
+  
+}
+
+# Summarize data into one table, sort by building size
+# iterate thru each year in the function, stored a list. Combine lists and order output by building size category
+
+all_owner_compare <- map(compared_years, ~create_uis_owner_compare(.x)) %>% 
+  reduce(bind_rows)
+
+all_owner_compare$rr_score <- (all_owner_compare$moe/1.645)/all_owner_compare$estimate*100
+
+all_owner_compare <- all_owner_compare %>% 
+  mutate(building_size = factor(building_size,
+                                levels = c('Single Family', '2-9 units', "10-19 units", '20+ units', 'Mobile Home/Other')),
+         rr_score=factor(case_when(rr_score <= 15 ~"good",
+                                   rr_score <= 30 ~"fair",
+                                   rr_score <= 50 ~"weak",
+                                   rr_score > 50 ~"unreliable",
+                                   !is.na(rr_score) ~ NA))) %>% 
+  arrange(year, name, building_size) %>% 
+  filter(building_size != is.na(building_size))
+
+# Chart by density of units, per county, over time (should not compare overlapping 5 YR estimates!!)
+library(psrcplot)
+library(ggplot2)
+
+middle_density <- all_owner_compare %>%
+  filter(building_size == '2-9 units') %>%
+  ungroup()
+
+mid_density_chart <- interactive_line_chart(middle_density, "year", "estimate", fill = "name",
+                                            title="Middle Density Owner Units (2-9)",color="pgnobgy_10")
+mid_density_chart
+
+# Chart out moderate density units, per county, over time
+moderate_density <- all_owner_compare %>%
+  filter(building_size == '10-19 units') %>%
+  ungroup()
+
+mod_density_chart <- interactive_line_chart(moderate_density, "year", "estimate", fill = "name",
+                                            title="Moderate Density Owner Units (10-19)",color="pgnobgy_10")
+mod_density_chart
+
+# Chart out high density units, per county, over time
+high_density <- all_owner_compare %>%
+  filter(building_size == '20+ units') %>%
+  ungroup()
+
+high_density_chart <- interactive_line_chart(high_density, "year", "estimate", fill = "name",
+                                             title="High Density Owner Units (20+)",color="pgnobgy_10")
+high_density_chart
+
+# Chart out single family units, per county, over time
+single_family <- all_owner_compare %>%
+  filter(building_size == 'Single Family') %>%
+  ungroup()
+
+single_family_chart <- interactive_line_chart(single_family, "year", "estimate", fill = "name",
+                                              title="Single Family Owner Units",color="pgnobgy_10")
+single_family_chart
+
+# Chart out mobile home/other units, per county, over time
+mh_other <- all_owner_compare %>%
+  filter(building_size == 'Mobile Home/Other') %>%
+  ungroup()
+
+mh_other_chart <- interactive_line_chart(mh_other, "year", "estimate", fill = "name",
+                                         title="Mobile Home/Other Owner Units",color="pgnobgy_10")
 mh_other_chart
