@@ -269,6 +269,10 @@ df_uis_renter_wide <- df_uis_renter_wide %>%
                                         rr_score_2021 > 50 ~"unreliable",
                                         !is.na(rr_score_2021) ~ NA)))
 
+# Calculate Z score - significant difference between vintages (compare 2010 to 2021)
+
+
+
 #------------------------Export tables for Excel------------------------
 work_book <- createWorkbook()
 addWorksheet(work_book, sheetName = "Owners 5YR ACS")
@@ -363,33 +367,6 @@ mod_density_chart <- interactive_line_chart(moderate_density, "year", "estimate"
                                 title="Moderate Density Units (10-19)",color="pgnobgy_10")
 mod_density_chart
 
-# Chart out high density units, per county, over time
-high_density <- all_compare %>%
-  filter(building_size == '20+ units') %>%
-  ungroup()
-
-high_density_chart <- interactive_line_chart(high_density, "year", "estimate", fill = "name",
-                                            title="High Density Units (20+)",color="pgnobgy_10")
-high_density_chart
-
-# Chart out single family units, per county, over time
-single_family <- all_compare %>%
-  filter(building_size == 'Single Family') %>%
-  ungroup()
-
-single_family_chart <- interactive_line_chart(single_family, "year", "estimate", fill = "name",
-                                             title="Single Family Units",color="pgnobgy_10")
-single_family_chart
-
-# Chart out mobile home/other units, per county, over time
-mh_other <- all_compare %>%
-  filter(building_size == 'Mobile Home/Other') %>%
-  ungroup()
-
-mh_other_chart <- interactive_line_chart(mh_other, "year", "estimate", fill = "name",
-                                              title="Mobile Home/Other Units",color="pgnobgy_10")
-mh_other_chart
-
 # Renter Occupied Units-----------------------
 
 create_uis_renter_compare <- function(compared_year) {
@@ -465,34 +442,6 @@ mod_density_chart <- interactive_line_chart(moderate_density, "year", "estimate"
                                             title="Moderate Density Renter Units (10-19)",color="pgnobgy_10")
 mod_density_chart
 
-# Chart out high density units, per county, over time
-high_density <- all_renter_compare %>%
-  filter(building_size == '20+ units') %>%
-  ungroup()
-
-high_density_chart <- interactive_line_chart(high_density, "year", "estimate", fill = "name",
-                                             title="High Density Renter Units (20+)",color="pgnobgy_10")
-high_density_chart
-
-# Chart out single family units, per county, over time
-single_family <- all_renter_compare %>%
-  filter(building_size == 'Single Family') %>%
-  ungroup()
-
-single_family_chart <- interactive_line_chart(single_family, "year", "estimate", fill = "name",
-                                              title="Single Family Renter Units",color="pgnobgy_10")
-single_family_chart
-
-# Chart out mobile home/other units, per county, over time
-mh_other <- all_renter_compare %>%
-  filter(building_size == 'Mobile Home/Other') %>%
-  ungroup()
-
-mh_other_chart <- interactive_line_chart(mh_other, "year", "estimate", fill = "name",
-                                         title="Mobile Home/Other Renter Units",color="pgnobgy_10")
-mh_other_chart
-
-
 # Owner Occupied Units-----------------------
 
 create_uis_owner_compare <- function(compared_year) {
@@ -567,30 +516,3 @@ moderate_density <- all_owner_compare %>%
 mod_density_chart <- interactive_line_chart(moderate_density, "year", "estimate", fill = "name",
                                             title="Moderate Density Owner Units (10-19)",color="pgnobgy_10")
 mod_density_chart
-
-# Chart out high density units, per county, over time
-high_density <- all_owner_compare %>%
-  filter(building_size == '20+ units') %>%
-  ungroup()
-
-high_density_chart <- interactive_line_chart(high_density, "year", "estimate", fill = "name",
-                                             title="High Density Owner Units (20+)",color="pgnobgy_10")
-high_density_chart
-
-# Chart out single family units, per county, over time
-single_family <- all_owner_compare %>%
-  filter(building_size == 'Single Family') %>%
-  ungroup()
-
-single_family_chart <- interactive_line_chart(single_family, "year", "estimate", fill = "name",
-                                              title="Single Family Owner Units",color="pgnobgy_10")
-single_family_chart
-
-# Chart out mobile home/other units, per county, over time
-mh_other <- all_owner_compare %>%
-  filter(building_size == 'Mobile Home/Other') %>%
-  ungroup()
-
-mh_other_chart <- interactive_line_chart(mh_other, "year", "estimate", fill = "name",
-                                         title="Mobile Home/Other Owner Units",color="pgnobgy_10")
-mh_other_chart
