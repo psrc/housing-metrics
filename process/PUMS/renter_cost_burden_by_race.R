@@ -1,7 +1,7 @@
 # TITLE: Renter Cost Burden by Race
 # GEOGRAPHIES: PSRC Region
 # DATA SOURCE: ACS PUMS 5YR
-# DATE MODIFIED: 5.09.2023
+# DATE MODIFIED: 5.22.2023
 # AUTHOR: Eric Clute
 
 library(magrittr)
@@ -66,11 +66,11 @@ rcb_re_all <- map(years, ~rcb_re_func(.x)) %>%
 library(psrcplot)
 library(ggplot2)
 
-rcb_re_severe_cb <- static_line_chart(rcb_re_all, "DATA_YEAR", "share_Greater than 50 percent", fill = "PRACE",
+rcb_re_severe_cb <- interactive_line_chart(rcb_re_all, "DATA_YEAR", "share_Greater than 50 percent", fill = "PRACE",
                                   title="Change in Severe Cost Burden by Race/Ethnicity (50%+ of income)",color="pgnobgy_10")
 rcb_re_severe_cb
 
-rcb_re_cb <- static_line_chart(rcb_re_all, "DATA_YEAR", "share_Between 30 and 50 percent", fill = "PRACE",
+rcb_re_cb <- interactive_line_chart(rcb_re_all, "DATA_YEAR", "share_Between 30 and 50 percent", fill = "PRACE",
                                        title="Change in Cost Burden by Race/Ethnicity (30-50% of income)",color="pgnobgy_10")
 rcb_re_cb
 
