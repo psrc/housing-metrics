@@ -47,8 +47,8 @@ library(openxlsx)
 ###########
 
 # working directory
-#setwd("J:/Projects/V2050/Housing/Monitoring/2023Update")
-setwd("~/psrc/housing-metrics/process/PUMS")
+setwd("J:/Projects/V2050/Housing/Monitoring/2023Update")
+#setwd("~/psrc/housing-metrics/process/PUMS")
 
 # years to include
 years <- c(2010, 2016, 2021)
@@ -57,8 +57,8 @@ years <- c(2010, 2016, 2021)
 export_tables <- TRUE 
 
 # directory for the Excel file (only used if export_tables is TRUE)
-#output_dir <- file.path(getwd(), "Renter Cost Burden by RE - Burden Category") 
-output_dir <- getwd()
+output_dir <- file.path(getwd(), "Renter Cost Burden by RE - Burden Category") 
+#output_dir <- getwd()
 
 # Excel file name (only used if export_tables is TRUE)
 output_table_name <- file.path(output_dir, "r_output.xlsx")
