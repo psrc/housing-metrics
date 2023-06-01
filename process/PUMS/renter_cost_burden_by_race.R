@@ -164,11 +164,11 @@ rcb_re_all <- map(rcb, ~rcb_re_func(.x)) %>%
 # graph change over time -----------
 rcb_re_severe_cb <- interactive_line_chart(rcb_re_all, "DATA_YEAR", "share_Greater than 50 percent", fill = "PRACE",
                                   title="Change in Severe Cost Burden by Race/Ethnicity (50%+ of income)",color="pgnobgy_10")
-rcb_re_severe_cb
+print(rcb_re_severe_cb)
 
 rcb_re_cb <- interactive_line_chart(rcb_re_all, "DATA_YEAR", "share_Between 30 and 50 percent", fill = "PRACE",
                                   title="Change in Cost Burden by Race/Ethnicity (30-50% of income)",color="pgnobgy_10")
-rcb_re_cb
+print(rcb_re_cb)
 
 
 # Summarize by income
@@ -181,11 +181,11 @@ rcb_inc_all <- map(rcb, ~rcb_inc_func(.x)) %>%
 rcb_inc_all_chart <- rcb_inc_all[!is.na(rcb_inc_all$`Greater than 50 percent`),]
 rcb_inc_severe_cb <- static_line_chart(t=rcb_inc_all_chart,x="DATA_YEAR",y="share_Greater than 50 percent", fill="income_bin",
                                           title="Change in Severe Cost Burden by Income (50%+ of income)",color="pgnobgy_10")
-rcb_inc_severe_cb
+print(rcb_inc_severe_cb)
 
 rcb_inc_cb <- static_line_chart(rcb_inc_all_chart, "DATA_YEAR", "share_Between 30 and 50 percent", fill = "income_bin",
                                    title="Change in Cost Burden by Income (30-50% of income)",color="pgnobgy_10")
-rcb_inc_cb
+print(rcb_inc_cb)
 
 # Exporting tables------------
 
