@@ -1,16 +1,19 @@
 # TITLE: Affordable Rental Housing by Tract - for each R/E Category
 # GEOGRAPHIES: PSRC Region & Census Tract
 # DATA SOURCE: 5YR ACS Data
-# LAST EDITED: 5.12.2023
+# LAST EDITED: 6.2.2023
 # AUTHOR: Eric Clute
 
 library(psrccensus)
 library(tidyverse)
 library(dplyr)
 library(srvyr)
+library(fredr)
+library(stringr)
 
 year <- (2010)
-setwd("C:/Users/eclute/Downloads")
+inflation_year <- (2021)
+file_path <- "J:/Projects/V2050/Housing/Monitoring/2023Update/Access to Affordable Rental Housing/r_output 2010 5YR Adjusted.csv"
 
 #------------ Collect Median Gross Rent by Tract ------------
 DP04Table_raw <- get_acs_recs(geography = 'tract',
@@ -28,6 +31,12 @@ grossrent <- DP04Table_raw %>%
          grossrent = estimate,
          grossrent_moe = moe)
 
+# Adjust for inflation
+grossrent$inflation_adjust <- pce_deflator(year, inflation_year)
+grossrent$grossrent <- grossrent$grossrent * grossrent$inflation_adjust
+grossrent$grossrent_moe <- grossrent$grossrent_moe * grossrent$inflation_adjust
+grossrent = grossrent[,!grepl("inflation_adjust",names(grossrent))]
+
 # Evaluate RR scores - can we trust these data?
 grossrent$rr_score <- (grossrent$grossrent_moe/1.645)/grossrent$grossrent*100
 grossrent <- grossrent %>%
@@ -38,8 +47,8 @@ grossrent <- grossrent %>%
                                    !is.na(rr_score) ~ NA)))
 
 #------------ Median Renter HH Income by Race/Ethnicity ------------
-setwd("C:/Users/eclute/Downloads")
 pums_raw <- get_psrc_pums(5,year,"h",c("PRACE","TEN","HINCP"))
+pums_raw <- real_dollars(pums_raw, inflation_year)
 
 # Create/modify variables
 
@@ -51,8 +60,11 @@ pums <- pums_raw %>% mutate(PRACE=factor(
             stringr::str_replace(" alone", "") %>%
             stringr::str_replace(" Alone", ""))))
 
-incbyre <- psrc_pums_median(pums, "HINCP", group_vars = c("DATA_YEAR","TEN", "PRACE"),rr=TRUE)
+incbyre <- psrc_pums_median(pums, "HINCP2021", group_vars = c("DATA_YEAR","TEN", "PRACE"),rr=TRUE)
 incbyre <- filter(incbyre, TEN == "Rented")
+
+incbyre <- incbyre %>% rename("HINCP_median" = "HINCP2021_median")
+incbyre <- incbyre %>% rename("HINCP_median_moe" = "HINCP2021_median_moe")
 
 # Create new fields, calculate cost max rent, moe upper/lower
 incbyre$maxmonthlyrent <- incbyre$HINCP_median/12*0.3
@@ -80,6 +92,4 @@ summarytbl$affordable_hispanic <- sum(na.omit(grossrent$affordable_hispanic))/nr
 summarytbl$affordable_white <- sum(na.omit(grossrent$affordable_white))/nrow(na.omit(grossrent))
 
 #-------------- Write to Excel --------------
-setwd("J:/Projects/V2050/Housing/Monitoring/2023Update")
-
-write.csv(grossrent, "Access to Affordable Rental Housing/r_output.csv", row.names=FALSE)
+write.csv(grossrent, file_path, row.names=FALSE)
