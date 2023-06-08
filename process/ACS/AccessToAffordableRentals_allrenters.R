@@ -45,7 +45,7 @@ grossrent <- grossrent %>%
                                    rr_score > 50 ~"unreliable",
                                    !is.na(rr_score) ~ NA)))
 
-#------------ Median Renter HH Income by Race/Ethnicity ------------
+#------------ Median Renter HH Income ------------
 pums_raw <- get_psrc_pums(5,year,"h",c("TEN","HINCP"))
 pums_raw <- real_dollars(pums_raw, inflation_year)
 
