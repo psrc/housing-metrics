@@ -1,0 +1,585 @@
+---
+title: "Homeownership_rate_exploring"
+author: "Meg Grzybowski"
+date: "2023-06-07"
+output: html_document
+---
+##code pulled from Eric's Tenure_re_and_income script for Housing Metrics 2023
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, 
+                      warning=FALSE, 
+                      message=FALSE) # formatting
+
+library(psrccensus)
+library(magrittr)
+library(dplyr)
+library(srvyr)
+library(tidyr)
+library(openxlsx)
+library(purrr)
+
+years <- c(2011,2016,2021)
+```
+
+```{r, tenure r/e category}
+
+tenure_re_func <- function(year){
+  
+  # Obtain the data
+  #setwd("C:/Users/MGrzybowski/Downloads")
+  pums_raw <- get_psrc_pums(5, year, "h", c("TEN","PRACE","HINCP"))
+  #setwd("Y:/Equity Indicators/experimenting/R-scripts/PUMS/Homeownership_exploring_files")
+  
+  # Create variables
+  pums_new_vars <- pums_raw %>% 
+    mutate(tenure=factor(case_when(TEN=="Owned free and clear"|TEN=="Owned with mortgage or loan (include home equity loans)" ~ "owner", !is.na(TEN) ~"renter"),
+                         levels=c("owner", "renter")),
+           PRACE=factor(
+             case_when(grepl("Other Race|Two or More Races", PRACE) ~"Other or Multiple Races",
+                       grepl("^Black ", PRACE) ~"Black",
+                       grepl("^Hispanic ", PRACE) ~"Hispanic/Latinx",
+                       !is.na(PRACE) ~stringr::str_replace_all(as.character(PRACE), " (and|or) ", "/") %>%
+                         stringr::str_replace(" alone", "") %>%
+                         stringr::str_replace(" Alone", ""))))
+  
+  # Analysis --------------
+  tenure_re <- psrc_pums_count(pums_new_vars, group_vars = c("PRACE","tenure"),rr=TRUE)
+  tenure_region <- psrc_pums_count(pums_new_vars, group_vars = c("tenure"),rr=TRUE)
+  
+  # Pivot table 1
+  tenure_re_piv <- tenure_re %>% 
+    pivot_wider(id_cols = c( 'DATA_YEAR', 'PRACE'),
+                names_from = 'tenure',
+                values_from = c('count', 'count_moe','reliability', 'share', 'share_moe'))
+  
+  tenure_re_piv <- tenure_re_piv[, c(1,2,12,13,15,16,14,17,3,4,5,6,7,8,9,10,11)]
+  tenure_re_piv <- tenure_re_piv[tenure_re_piv$PRACE !='Total',]
+  
+  # Pivot table 2
+  tenure_region_piv <- tenure_region %>%
+    pivot_wider(id_cols = c( 'DATA_YEAR'),
+                names_from = 'tenure',
+                values_from = c('count', 'count_moe','reliability', 'share', 'share_moe'))
+  
+  tenure_region_piv$PRACE <- "Region Avg"
+  
+  # Combine together - adds regional average to table
+  tenure_re_piv <- rbind(tenure_re_piv, tenure_region_piv)
+  
+}
+
+# Run function -----------
+tenure_re_piv_all <- map(years, ~tenure_re_func(.x)) %>%
+  reduce(bind_rows)
+```
+
+```{r, prep for graphs}
+
+# Graph ownership over time -----------
+library(psrcplot)
+library(ggplot2)
+
+ownership_re <- interactive_line_chart(tenure_re_piv_all, "DATA_YEAR", "share_owner", fill = "PRACE",
+                                           title="Change in Ownership by Race/Ethnicity",color="pognbgy_10")
+ownership_re
+
+# Draft code for bar charts - percent tenure by RE
+# tenure_re <- static_bar_chart(tenure_re_piv_all, "tenure", "perc_tenure", pos = "stack", column_vs_bar = "bar", color = "pgnobgy_10")
+```
+
+```{r, Group by Tenure (ownership), Income, R/E Category}
+
+tenure_inc_func <- function(year){
+  
+  # Obtain the data
+  #setwd("C:/Users/MGrzybowski/Downloads")
+  pums_raw <- get_psrc_pums(5, year, "h", c("TEN","PRACE","HINCP"))
+  #setwd("Y:/Equity Indicators/experimenting/R-scripts/PUMS/Homeownership_exploring_files")
+  
+  # Create variables
+  pums_new_vars <- pums_raw %>% 
+    mutate(income_bin=factor(case_when(HINCP < 50000 ~ "Under $50,000",
+                                       HINCP < 75000 ~ "$50,000-$74,999",
+                                       HINCP < 100000 ~ "$75,000-$99,999",
+                                       HINCP < 150000 ~ "$100,000-$149,999",
+                                       HINCP < 200000 ~ "$150,000-$199,999",
+                                       HINCP >=200000 ~ "$200,000 or more",
+                                       !is.na(HINCP) ~ "Else / Prefer not to answer"),
+                             levels=c("Under $50,000",                                     
+                                      "$50,000-$74,999",
+                                      "$75,000-$99,999",
+                                      "$100,000-$149,999",
+                                      "$150,000-$199,999",
+                                      "$200,000 or more",
+                                      "Else / Prefer not to answer")),
+           tenure=factor(case_when(TEN=="Owned free and clear"|TEN=="Owned with mortgage or loan (include home equity loans)" ~ "owner", !is.na(TEN) ~"renter"),
+                         levels=c("owner", "renter")),
+           PRACE=factor(
+             case_when(grepl("Other Race|Two or More Races", PRACE) ~"Other or Multiple Races",
+                       grepl("^Black ", PRACE) ~"Black",
+                       grepl("^Hispanic ", PRACE) ~"Hispanic/Latinx",
+                       !is.na(PRACE) ~stringr::str_replace_all(as.character(PRACE), " (and|or) ", "/") %>%
+                         stringr::str_replace(" alone", "") %>%
+                         stringr::str_replace(" Alone", ""))))
+  
+  # Analysis --------------
+  tenure_inc_re <- psrc_pums_count(pums_new_vars, group_vars = c("income_bin","PRACE","tenure"),rr=TRUE)
+  tenure_inc_re_region <- psrc_pums_count(pums_new_vars, group_vars = c("income_bin","tenure"),rr=TRUE)
+  
+
+  tenure_inc_re <- tenure_inc_re %>% filter(tenure=='owner')
+  tenure_inc_re_region <- tenure_inc_re_region %>% filter(tenure=='owner')
+  
+  # Pivot table 1
+  tenure_inc_re_piv <- tenure_inc_re %>% 
+    pivot_wider(id_cols = c( 'DATA_YEAR', 'tenure', 'PRACE'),
+                names_from = 'income_bin',
+                values_from = c('count', 'count_moe', 'share', 'share_moe','reliability'))
+  
+  tenure_inc_re_piv<- tenure_inc_re_piv[, c(1,2,3,16,17,18,19,20,21,22,23,24,25,26,27,4,5,6,7,8,9,10,11,12,13,14,15,28,29,30,31,32,33)]
+  
+  # Pivot table 2
+  tenure_inc_re_region_piv <- tenure_inc_re_region %>% 
+    pivot_wider(id_cols = c( 'DATA_YEAR', 'tenure'),
+                names_from = 'income_bin',
+                values_from = c('count', 'count_moe', 'share', 'share_moe','reliability'))
+  
+  tenure_inc_re_region_piv$PRACE <- "Region Avg"
+  
+  # Combine together - adds regional average to table
+  tenure_inc_re_piv <- rbind(tenure_inc_re_piv, tenure_inc_re_region_piv)
+  
+  # Limit to 4 largest RE groups (Asian, Black, Hispanic, White) - keep region avg
+  tenure_inc_re_piv <- tenure_inc_re_piv %>% filter(!row_number() %in% c(1,5,6))
+
+}
+
+# Run function -----------
+tenure_inc_re_all <- map(years, ~tenure_inc_func(.x)) %>%
+  reduce(bind_rows)
+```
+```{r, Group by Tenure (ownership), Income (POVPIP), R/E Category (HRACE), HDIS, LNGI, R65, R18}
+
+tenure_all_func <- function(year){
+  
+  # Obtain the data
+  #setwd("C:/Users/MGrzybowski/Downloads")
+  pums_raw <- get_psrc_pums(5, year, "h", c("COUNTY", "TEN","POVPIP","PRACE", "R18", "R65", "LNGI"))
+  #setwd("Y:/Equity Indicators/experimenting/R-scripts/PUMS/Homeownership_exploring_files")
+  
+  # Create variables, minus disability
+  pums_new_vars <- pums_raw %>% 
+    mutate(income_bin = factor(case_when(POVPIP<200 ~ "Low Income",
+                            !is.na(POVPIP)~ "Non-Low Income")),    
+           tenure=factor(case_when(TEN=="Owned free and clear"|TEN=="Owned with mortgage or loan (include home equity loans)" ~ "owner", !is.na(TEN) ~"renter"),
+                         levels=c("owner", "renter")),
+           PRACE= factor(case_when(PRACE=="White alone" ~ "Non-POC",
+                            !is.na(PRACE) ~ "POC")),
+           Youth_cat=factor(case_when(grepl("^No ", R18)~ "Household without youth",
+                            !is.na(R18)~ "Household with youth")),
+           Older_cat=factor(case_when(grepl("^No ", R65) ~ "Household without older adult",
+                            !is.na(R65)~ "Household with older adult")),
+           LEP_cat=factor(case_when(grepl("^No one", LNGI) ~ "Limited English proficiency",
+                            !is.na(LNGI)~ "English proficient")))
+
+# Analysis --------------
+  tenure_all <- psrc_pums_count(pums_new_vars, group_vars = c("COUNTY", "tenure", "income_bin", "PRACE", "Youth_cat", "Older_cat", "LEP_cat"),rr=TRUE) %>%
+    filter(tenure == "owner") %>%
+    filter(PRACE != "Total") %>%
+    filter(income_binyea  != "Total") %>%
+    filter(Youth_cat != "Total") %>%
+    filter(Older_cat != "Total") %>%
+    filter(LEP_cat != "Total") %>%
+    mutate(data_year_yr = format(DATA_YEAR,format="%Y"))
+}
+
+# Run function -----------
+tenure_all <- map(years, ~tenure_all_func(.x)) %>%
+  reduce(bind_rows)
+```
+
+``` {r, eval = FALSE}
+# clean data set
+indicator_measure <- 'tenure'
+# set up a variable for titles
+indicator_title <- 'Homeownership rates'
+```
+
+```{r}
+# renaming labels ----
+data_clean <- data_full %>% 
+  mutate(focus_type_edit = case_when(focus_type=="POC_cat"~"race/ethnicity",
+                                     focus_type=="Disability_cat"~"disability status",
+                                     focus_type=="LEP_cat"~"English proficiency",
+                                     focus_type=="Income_cat"~"income",
+                                     focus_type=="Youth_cat"~"youth <18",
+                                     focus_type=="Older_cat"~"older adults 65+"))
+
+# re-ordering variables ----
+data_clean$focus_attribute_ord <- factor(data_clean$focus_attribute,
+                                         levels = c("POC",
+                                                    "Non-POC",
+                                                    "Low Income",
+                                                    "Non-Low Income",
+                                                    "With disability",
+                                                    "Without disability",
+                                                    "Limited English proficiency",
+                                                    "English proficient",
+                                                    "Household with youth",
+                                                    "Household without youth", 
+                                                    "Household with older adult",
+                                                    "Household without older adult",
+                                                    "Total"))
+
+data_clean$county_ord <- factor(data_clean$county,
+                                levels = c("King",
+                                           "Kitsap",
+                                           "Pierce",
+                                           "Snohomish",
+                                           "Region"))
+
+data_clean$focus_type_ord <- factor(data_clean$focus_type_edit,
+                                    levels = c("race/ethnicity",
+                                               "income",
+                                               "disability status",
+                                               "English proficiency",
+                                               "youth <18",
+                                               "older adults 65+"))
+        
+Disability_cat=if("DIS" %in% colnames(so)){
+                       factor(case_when(grepl("^With ", DIS)~ "With disability",
+                                 grepl("^Without ", DIS)~ "Without disability"))
+                   }else if("HDIS" %in% colnames(so)){
+                       factor(case_when(grepl("^With ", HDIS)~ "With disability",
+                                 grepl("^Without ", HDIS) ~ "Without disability"))}
+```
+
+```{r}
+just_region_11 <- tenure_all %>% 
+  filter(COUNTY== "King") %>% 
+  filter(DATA_YEAR==2011) %>% 
+  arrange(PRACE, tenure)
+just_region_16 <- tenure_all %>% 
+  filter(COUNTY=="King") %>% 
+  filter(DATA_YEAR==2016) %>% 
+  arrange(PRACE, tenure)
+just_region_21 <- tenure_all %>% 
+  filter(COUNTY=="King") %>% 
+  filter(DATA_YEAR==2021) %>% 
+  arrange(PRACE, tenure)
+
+bar_chart <- static_bar_chart(t=just_region_11,
+                               x="count", y="PRACE",
+                               fill="tenure",
+                               est = "percent",
+                               pos= "stack",
+                               color = "psrc_light", 
+                               title = paste0(indicator_title, ": King (2011)"),
+                               subtitle = "by equity focus group",
+                               source = "U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)")
+bar_chart
+
+bar_chart <- static_bar_chart(t=just_region_16,
+                               x="count", y="PRACE",
+                               fill="tenure",
+                               est = "percent",
+                               pos= "stack",
+                               color = "psrc_light",
+                               title = paste0(indicator_title, ": King (2016)"),
+                               subtitle = "by equity focus group",
+                               source = "U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)")
+bar_chart
+
+bar_chart <- static_bar_chart(t=just_region_21,
+                               x="count", y="PRACE",
+                               fill="tenure",
+                               est = "percent",
+                               pos= "stack",
+                               color = "psrc_light",
+                               title = paste0(indicator_title, ": King (2021)"),
+                               subtitle = "by equity focus group",
+                               source = "U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)")
+
+bar_chart
+```
+
+### 2b. Facets by geography
+*In this section we explore trends by different groups with MOEs. These charts help to show any missing data by geography, year, or focus group/subgroup.*
+```{r, include=FALSE}
+facet_by_geography <- function(geography, focus.text){
+  # filter data
+  data_clean_geo <- data_clean_more %>% 
+    filter(COUNTY==geography)
+  
+  # make chart, adjust estimate type, subtitle
+  static_facet_column_chart(t=data_clean_geo,
+                            x="data_year_yr", y="fact_value",
+                            fill="vulnerability", facet="focus_type_ord",
+                            color="psrc_light",
+                            est ="percent",
+                            moe = "margin_of_error",
+                            dec=2,
+                            scales="fixed",
+                            ncol=3,
+                            title=paste0(indicator_title, focus.text),
+                            subtitle="More than 1.5 persons per bedroom",
+                            source="U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)")
+}
+```
+
+```{r}
+facet_by_geography("Region", ": Region")
+facet_by_geography("King", ": King County")
+facet_by_geography("Kitsap", ": Kitsap County")
+facet_by_geography("Pierce", ": Pierce County")
+facet_by_geography("Snohomish", ": Snohomish County")
+```
+\
+\
+
+## 3. Developing visuals
+*In this section we further develop the draft visuals for communicating the results and supporting the narrative for the Equity Tracker webpages. These charts are slightly more refined by slicing the data by geography and equity focus group. The line charts don't include MOEs, but they help make connections between the same groups over time.* 
+
+### Line charts by geography
+#### High / low vulnerability
+```{r, include=FALSE}
+facet_line_by_geography_fixed <- function(geography, focus.text){
+  # filter data
+  data_clean_geo <- data_clean_more %>% 
+    filter(COUNTY==geography)
+  
+  # make chart, adjust estimate type, subtitle
+  static_facet_line_chart(t=data_clean_geo,
+                          x="data_year_yr", y="fact_value",
+                          fill="vulnerability", facet="focus_type_ord",
+                          color="psrc_light",
+                          est ="percent",
+                          dec=2,
+                          scales="fixed",
+                          ncol=3,
+                          title=paste0(indicator_title, focus.text),
+                          subtitle="More than 1.5 persons per bedroom",
+                          source="U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)")
+    #scale_y_continuous(limits = c(0, 30))
+}
+
+facet_line_by_geography_free <- function(geography, focus.text){
+  # filter data
+  data_clean_geo <- data_clean_more %>% 
+    filter(COUNTY==geography)
+  
+  # make chart, adjust estimate type, subtitle
+  static_facet_line_chart(t=data_clean_geo,
+                          x="data_year_yr", y="fact_value",
+                          fill="vulnerability", facet="focus_type_ord",
+                          color="psrc_light",
+                          est ="percent",
+                          dec=2,
+                          scales="free",
+                          ncol=3,
+                          title=paste0(indicator_title, focus.text),
+                          subtitle="More than 1.5 persons per bedroom",
+                          source="U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)")
+    #scale_y_continuous(limits = c(0, 30))
+}
+```
+
+```{r}
+facet_line_by_geography_fixed("Region", ": Region")
+facet_line_by_geography_fixed("King", ": King County")
+facet_line_by_geography_fixed("Kitsap", ": Kitsap County")
+facet_line_by_geography_fixed("Pierce", ": Pierce County")
+facet_line_by_geography_fixed("Snohomish", ": Snohomish County")
+
+facet_line_by_geography_free("Region", ": Region")
+facet_line_by_geography_free("King", ": King County")
+facet_line_by_geography_free("Kitsap", ": Kitsap County")
+facet_line_by_geography_free("Pierce", ": Pierce County")
+facet_line_by_geography_free("Snohomish", ": Snohomish County")
+```
+
+#### calculated difference b/t
+The 5 geographies are all included in the facets by geography, but they could be separated out to create 5 individual charts - one for each geography.
+```{r}
+dif_groups <- function(geography, group, category){
+  region_btgrp_dif <- data_clean_more %>% 
+    # dplyr::filter(county==geography) %>% 
+    dplyr::filter(focus_type==group) %>% 
+    group_by(DATA_YEAR) %>% 
+    mutate(dif = ifelse(focus_attribute!=category, fact_value - fact_value[focus_attribute == category], 0)) %>% 
+    dplyr::filter(dif!=0)
+}
+
+poc <- dif_groups("Region", "POC_cat", 'POC')
+dis <- dif_groups("Region", "Disability_cat", 'With disability')
+income <- dif_groups("Region", "Income_cat", 'Low Income')
+youth <- dif_groups("Region", "Youth_cat", 'Household with youth')
+older <- dif_groups("Region", "Older_cat", 'Household with older adult')
+lep <- dif_groups("Region", "LEP_cat", 'Limited English proficiency')
+
+dif_equity_groups <- rbind(poc, 
+                           dis, 
+                           income,
+                           youth,
+                           older,
+                           lep) %>% 
+  dplyr::group_by(focus_type) # without this, colors were off
+
+# facet line chart option
+dif_equity <- static_facet_line_chart(t=dif_equity_groups,
+                                      x="data_year_yr", y="dif",
+                                      fill="county_ord", facet="focus_type_ord",
+                                      color="psrc_light",
+                                      est ="percent",
+                                      dec=2,
+                                      scales="fixed",
+                                      ncol=3,
+                                      title=paste0(indicator_title),
+                                      subtitle="More than 1.5 persons",
+                          source="U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)") #+ theme(legend.position = "none")
+
+dif_equity
+```
+
+### Line charts by equity group
+#### High / low vulnerability
+```{r, include=FALSE}
+equity_group_facet_line <- function(focus.type, focus.text){
+  # filter data
+  data_clean_filter <- data_clean_more %>% 
+    filter(focus_type==focus.type)
+  
+  # make chart, adjust estimate type, subtitle, and y limits
+  static_facet_line_chart(t=data_clean_filter,
+                          x="data_year_yr", y="fact_value",
+                          fill="focus_attribute", facet="COUNTY",
+                          color="psrc_light",
+                          est ="percent",
+                          dec=2,
+                          scales="fixed",
+                          ncol=3,
+                          title=paste0(indicator_title, focus.text),
+                          subtitle="More than 1.5 persons",
+                          source="U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)") 
+}
+```
+
+```{r}
+equity_group_facet_line("POC_cat", " (race/ethnicity)")
+equity_group_facet_line("Income_cat", " (income)")
+equity_group_facet_line("Disability_cat", " (disability)")
+equity_group_facet_line("Youth_cat", " (youth <18)")
+equity_group_facet_line("Older_cat", " (adults 65+)")
+equity_group_facet_line("LEP_cat", " (limited English proficiency)")
+```
+
+#### calculated difference b/t
+The 6 equity focus groups are all included in the facets by geography, but they could be separated out to create 6 individual charts - one for each focus group.
+```{r}
+dif_groups <- function(group, category){
+
+  btgrp_dif <- data_clean_more %>% 
+    dplyr::filter(focus_type==group) %>% 
+    group_by(DATA_YEAR) %>% 
+    mutate(dif = ifelse(focus_attribute!=category, fact_value - fact_value[focus_attribute == category], 0)) %>% 
+    dplyr::filter(dif!=0)
+}
+
+poc <- dif_groups("POC_cat", 'POC')
+dis <- dif_groups("Disability_cat", 'With disability')
+income <- dif_groups("Income_cat", 'Low Income')
+youth <- dif_groups("Youth_cat", 'Household with youth')
+older <- dif_groups("Older_cat", 'Household with older adult')
+lep <- dif_groups("LEP_cat", 'Limited English proficiency')
+
+dif_equity_groups <- rbind(poc, 
+                           dis, 
+                           income,
+                           youth,
+                           older,
+                           lep) %>% 
+  dplyr::group_by(focus_type) # without this, colors were off
+
+# facet line chart option
+dif_equity <- static_facet_line_chart(t=dif_equity_groups,
+                                      x="data_year_yr", y="dif",
+                                      fill="focus_type_edit", facet="county_ord",
+                                      color="psrc_light",
+                                      est ="percent",
+                                      dec=2,
+                                      scales="fixed",
+                                      ncol=3,
+                                      title=paste0(indicator_title),
+                                      subtitle="More than 1.5 persons",
+                                      source="U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)") #+ theme(legend.position = "none")
+
+dif_equity
+```
+
+### Line chart: all categories
+```{r}
+data_clean_region <- data_clean_more %>% 
+  dplyr::filter(COUNTY=="Region")
+
+#line_chart <- static_line_chart(t=data_clean_region,
+ #                               x="data_year_yr", y="fact_value",
+  #                              fill="focus_attribute_ord",
+   #                             est = "percent",
+    #                            breaks = NULL,
+     #                           lwidth = 1,
+      #                          color = "psrc_pairs",
+       #                         title = "Housing cost burden: Region",
+        #                        subtitle = "More than 1.5 persons per bedroom",
+         #                       source = "U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)") + ylim(0, 0.65)
+
+#line_chart
+
+line_chart <- interactive_line_chart(t=data_clean_region,
+                                     x="data_year_yr", y="fact_value",
+                                     fill="focus_attribute_ord",
+                                     est = "percent",
+                                     breaks = NULL,
+                                     lwidth = 1,
+                                     color = "psrc_pairs",
+                                     title = "Housing cost burden: Region",
+                                     subtitle = "More than 1.5 persons per bedroom",
+                                     source = "U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)")
+
+line_chart
+```
+
+```{r}
+static_facet_line_chart(t=data_clean_region,
+                        x="data_year_yr", y="fact_value",
+                        fill="focus_type_ord", facet="vulnerability",
+                        color="psrc_pairs",
+                        est ="percent",
+                        dec=2,
+                        scales="fixed",
+                        ncol=3,
+                        title=paste0(indicator_title,": Region"),
+                        subtitle="More than 1.5 persons per bedroom",
+                        source="U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)")
+```
+
+```{r, write to Excel}
+setwd("Y:/Equity Indicators/experimenting/R-scripts/PUMS/Homeownership_exploring_files")
+
+work_book <- createWorkbook()
+addWorksheet(work_book, sheetName = "tenure by RE")
+writeData(work_book, "tenure by RE", tenure_re_piv_all)
+addWorksheet(work_book, sheetName = "ownership by RE & inc")
+writeData(work_book, "ownership by RE & inc", tenure_inc_re_all)
+saveWorkbook(work_book, file = "Tenure by RE and Income/r_output.xlsx", overwrite = TRUE)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
