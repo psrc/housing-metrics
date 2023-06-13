@@ -906,7 +906,7 @@ line_chart <- static_line_chart(t=data_clean_region,
 
 line_chart
 
-line_chart <- interactive_line_chart(t=data_clean_region,
+line_chart2 <- interactive_line_chart(t=data_clean_region,
                                      x="data_year_yr", y="fact_value",
                                      fill="focus_attribute_ord",
                                      est = "currency",
@@ -917,7 +917,7 @@ line_chart <- interactive_line_chart(t=data_clean_region,
                                      subtitle = "values are adjusted to 2020 USD",
                                      source = "U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)")
 
-line_chart
+line_chart2
 ```
 ### Line chart: by vulnerability
 ```{r}
