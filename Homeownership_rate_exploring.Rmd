@@ -165,16 +165,13 @@ tenure_inc_re_all <- map(years, ~tenure_inc_func(.x)) %>%
 tenure_all_func <- function(year){
   
   # Obtain the data
-  #setwd("C:/Users/MGrzybowski/Downloads")
-  pums_raw <- get_psrc_pums(5, 2021, "h", c("COUNTY", "TEN","POVPIP","PRACE", "R18", "R65", "LNGI"))
-  #setwd("Y:/Equity Indicators/experimenting/R-scripts/PUMS/Homeownership_exploring_files")
+  pums_raw <- get_psrc_pums(5, year, "h", c("COUNTY", "TEN","POVPIP","PRACE", "R18", "R65", "LNGI", "HDIS"))
   
-  # Create variables, minus disability
+  # Create variables
   pums_new_vars <- pums_raw %>% 
     mutate(income_bin = factor(case_when(POVPIP<200 ~ "Low Income",
                             !is.na(POVPIP)~ "Non-Low Income")),    
-           tenure=factor(case_when(TEN=="Owned free and clear"|TEN=="Owned with mortgage or loan (include home equity loans)" ~
-                                     "owner", !is.na(TEN) ~"renter"),
+           tenure=factor(case_when(TEN=="Owned free and clear"|TEN=="Owned with mortgage or loan (include home equity loans)" ~ "owner", !is.na(TEN) ~"renter"),
                          levels=c("owner", "renter")),
            PRACE= factor(case_when(PRACE=="White alone" ~ "Non-POC",
                             !is.na(PRACE) ~ "POC")),
@@ -183,49 +180,65 @@ tenure_all_func <- function(year){
            Older_cat=factor(case_when(grepl("^No ", R65) ~ "Household without older adult",
                             !is.na(R65)~ "Household with older adult")),
            LEP_cat=factor(case_when(grepl("^No one", LNGI) ~ "Limited English proficiency",
-                            !is.na(LNGI)~ "English proficient")))
+                            !is.na(LNGI)~ "English proficient")),
+           Disability_cat=factor(case_when(grepl("^With ", HDIS)~ "With disability",
+                            !is.na(HDIS)~ "Without disability")))%>%
+    mutate(HDIS = as.character(HDIS)) %>%
+    mutate(Disability_cat = as.character(Disability_cat)) %>%
+    mutate(DATA_YEAR = format(DATA_YEAR,format="%Y"))
 
   # Analysis --------------
-  tenure_all <- psrc_pums_count(pums_new_vars, 
-                                stat_var = "tenure",
-                                group_vars = c("COUNTY", "income_bin", "PRACE", "Youth_cat", "Older_cat", "LEP_cat"),rr=TRUE) %>%
-    filter(tenure == "owner") %>%
-    mutate(data_year_yr = format(DATA_YEAR,format="%Y"))
+  tenure_inc_re <- psrc_pums_count(pums_new_vars, group_vars = c("COUNTY", "tenure", "income_bin", "PRACE", "Youth_cat", "Older_cat", "LEP_cat",
+                                                                 "Disability_cat"),rr=TRUE)%>%
+    filter(tenure == 'owner')%>%
+    filter(PRACE != "Total") %>%
+    filter(income_bin  != "Total") %>%
+    filter(Youth_cat != "Total") %>%
+    filter(Older_cat != "Total") %>%
+    filter(LEP_cat != "Total") %>%
+    filter(Disability_cat != 'Total')
   
-  colnames(tenure_all)[colnames(tenure_all) == 'share'] <- 'fact_value'
+  colnames(tenure_inc_re)[colnames(tenure_inc_re) == 'share'] <- 'fact_value'
+    
+  tenure_inc_re_region <- psrc_pums_count(pums_new_vars, group_vars = c("tenure", "income_bin", "PRACE", "Youth_cat", "Older_cat", "LEP_cat",
+                                                                        "Disability_cat"),rr=TRUE)%>%
+    filter(tenure == 'owner')%>%
+    filter(PRACE != "Total") %>%
+    filter(income_bin  != "Total") %>%
+    filter(Youth_cat != "Total") %>%
+    filter(Older_cat != "Total") %>%
+    filter(LEP_cat != "Total") %>%
+    filter(Disability_cat != 'Total')
   
-  tenure_all_region <- psrc_pums_count(pums_new_vars, group_vars = c("tenure"),rr=TRUE)
-  
-  colnames(tenure_all_region)[colnames(tenure_all_region) == 'share'] <- 'fact_value'
+  colnames(tenure_inc_re_region)[colnames(tenure_inc_re_region) == 'share'] <- 'fact_value'
   
   # Pivot table 1
-  tenure_re_piv <- tenure_all %>% 
+  tenure_re_piv <- tenure_inc_re %>% 
      pivot_longer(cols = c("income_bin", "PRACE", "Youth_cat", "Older_cat", "LEP_cat", "Disability_cat"), 
                names_to = "focus_type", 
-               values_to = 'focus_attribute') %>% 
+               values_to = 'attribute_type') %>% 
     mutate(focus_type=case_when(focus_type=="income_bin"~"income",
                         focus_type=="PRACE"~"race/ethnicity",
                         focus_type=="Youth_cat"~"youth <18",
                         focus_type=="Older_cat"~"older adults 65+",
-                        focus_type=="LEP_cat"~"English proficiency"))
-  
-  tenure_re_piv <- tenure_re_piv[tenure_re_piv$PRACE !='Total',]
-  
-  # Pivot table 2
-  tenure_region_piv <- tenure_all_region %>%
+                        focus_type=="LEP_cat"~"English proficiency",
+                        focus_type=="Disability_cat"~"disability status"))
+ 
+  # Pivot table 2 
+  tenure_re_region_piv <- tenure_inc_re_region %>% 
     pivot_longer(cols = c("income_bin", "PRACE", "Youth_cat", "Older_cat", "LEP_cat", "Disability_cat"), 
                names_to = "focus_type", 
-               values_to = 'focus_attribute') %>% 
+               values_to = 'attribute_type') %>% 
     mutate(focus_type=case_when(focus_type=="income_bin"~"income",
                         focus_type=="PRACE"~"race/ethnicity",
                         focus_type=="Youth_cat"~"youth <18",
                         focus_type=="Older_cat"~"older adults 65+",
-                        focus_type=="LEP_cat"~"English proficiency"))
-  
-  tenure_region_piv$PRACE <- "Region Avg"
-  
+                        focus_type=="LEP_cat"~"English proficiency",
+                        focus_type=="Disability_cat"~"disability status")) 
+
   # Combine together - adds regional average to table
-  tenure_re_piv <- rbind(tenure_re_piv, tenure_region_piv)
+  tenure_re_piv_all <- left_join(tenure_re_piv, tenure_re_region_piv)
+
 }
 
 # Run function -----------
