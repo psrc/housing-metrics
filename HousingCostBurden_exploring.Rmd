@@ -1,10 +1,4 @@
 ---
-title: "Homeownership_rate_exploring2"
-author: "Meg Grzybowski"
-date: "2023-06-20"
-output: html_document
----
----
 title: "Housing Cost Burden"
 subtitle: "Data source(s): PUMS 2020, 5y (CSV)"
 author: "Meg Grzybowski"
@@ -109,9 +103,9 @@ unique(pums_ospi_elmer$data_year)
 # Housing Cost Burden
 ```{r indicator specific information, include=FALSE}
 # set up a variable for analysis
-indicator_measure <- 'tenure'
+indicator_measure <- 'rent_burden'
 # set up a variable for titles
-indicator_title <- 'Housing Tenure'
+indicator_title <- 'Rent Burden'
 ```
 
 ## 1. Explore data
@@ -122,8 +116,10 @@ indicator_title <- 'Housing Tenure'
 library(srvyr)
 
 data_indicator <- pums_ospi_elmer %>% 
- # dplyr::filter(indicator_attribute == "Owned")%>%
- # dplyr::select(-indicator_fact_id)%>%
+  mutate(indicator_attribute = case_when(indicator_attribute == "Greater than 50 percent" |
+                                          indicator_attribute == "Between 30 and 50 percent" ~ "Cost Burdened (More than or Equal to 30 percent)",
+                                          TRUE~ indicator_attribute)) %>% 
+  dplyr::select(-indicator_fact_id)%>%
   group_by(across(!c(fact_value, margin_of_error)))%>%
   summarise(fact_value = sum(fact_value, na.rm = TRUE),
             margin_of_error = moe_sum(margin_of_error, estimate = fact_value, na.rm = TRUE))
@@ -220,7 +216,7 @@ The disability category and LEP is missing all data in 2011.
 
 ##### Year / equity focus sub-group
 ```{r}
-num_yr_subgrp <- num_county*num_indatt #10
+num_yr_subgrp <- num_county*num_indatt #20
 ```
 If we look at the data by year and focus sub-group, there should be **`r num_yr_subgrp`** entries per year/focus sub-group.
 ```{r}
@@ -326,8 +322,8 @@ data_clean$focus_type_ord <- factor(data_clean$focus_type_edit,
 # indicator specific re-ordering
 
 data_clean$indicator_attribute <- factor(data_clean$indicator_attribute,
-                                    levels = c("Rented",
-                                               "Owned"))
+                                    levels = c("Less than 30 percent",
+                                               "Cost Burdened (More than or Equal to 30 percent)"))
 ```
 \
 
@@ -335,7 +331,7 @@ data_clean$indicator_attribute <- factor(data_clean$indicator_attribute,
 These charts were generated to ensure the labels across years are consistent/make sense. There had been an issue with misassigned labels because tidycensus::pums_variables, i.e. the only digital data dictionary available to associate labels with codes, exists only from 2017 forward. Most variables have had consistent codes, but in cases where the codes have shifted over time, using the 2017 lookup winds up mischaracterizing categories.
 \
 \
-These charts also help to confirm that the shares add up to 100% - only relevant when *indicator_attribute* has more than one category. The *indicator_attribute* for rent cost burden includes 2 categories: "Owns" and "Rented" 
+These charts also help to confirm that the shares add up to 100% - only relevant when *indicator_attribute* has more than one category. The *indicator_attribute* for rent cost burden includes 2 categories: "More than 30 percent" and "Less than 30 percent" 
 \
 \
 *The colors of the charts may not be consistent between the years depending on missing data.* 
@@ -401,35 +397,35 @@ The following code will need to be adjusted to fit the fields specific to the da
 #### By *indicator_attribute*
 ```{r}
 # separating indicator attributes by levels ----
-data_clean_rent <- data_clean %>% 
-  filter(indicator_attribute=="Rented")
-data_clean_own <- data_clean %>% 
-  filter(indicator_attribute=="Owned")
+data_clean_over <- data_clean %>% 
+  filter(indicator_attribute=="Cost Burdened (More than or Equal to 30 percent)")
+data_clean_lessthirty <- data_clean %>% 
+  filter(indicator_attribute=="Less than 30 percent")
 ```
 
 ```{r}
 # plot data
 qplot(data_year_yr, fact_value, 
       colour = county, shape = focus_type_ord, 
-      data = data_clean_rent, 
-      main = paste0(indicator_title, ": Region, rented")) + theme(axis.title.x = element_blank(),
+      data = data_clean_over, 
+      main = paste0(indicator_title, ": Region, more than or equal to 30 percent")) + theme(axis.title.x = element_blank(),
                                                           axis.title.y = element_blank()) + ylim(0, 1)
 
 qplot(data_year_yr, fact_value, 
       colour = county, shape = focus_type_ord, 
-      data = data_clean_own, 
-      main = paste0(indicator_title, ": Region, owned")) + theme(axis.title.x = element_blank(),
+      data = data_clean_lessthirty, 
+      main = paste0(indicator_title, ": Region, less than 30 percent")) + theme(axis.title.x = element_blank(),
                                                           axis.title.y = element_blank()) + ylim(0, 1)
 ```
 
 #### By Year
 ```{r}
 # separating by year - focusing on only more than 50 percent cost burdened
-data_clean11 <- data_clean_own %>% 
+data_clean11 <- data_clean_over %>% 
   filter(data_year==2011)
-data_clean16 <- data_clean_own %>% 
+data_clean16 <- data_clean_over %>% 
   filter(data_year==2016)
-data_clean21 <- data_clean_own %>% 
+data_clean21 <- data_clean_over %>% 
   filter(data_year==2021)
 ```
 
@@ -460,7 +456,7 @@ qplot(focus_type_ord, fact_value,
 ```{r, include=FALSE}
 facet_by_geography <- function(geography, focus.text){
   # filter data
-  data_clean_geo <- data_clean_own %>% 
+  data_clean_geo <- data_clean_over %>% 
     filter(county==geography)%>%
     filter(data_year_yr==2021)
   
@@ -474,8 +470,8 @@ facet_by_geography <- function(geography, focus.text){
                             dec=2,
                             scales="fixed",
                             ncol=3,
-                            title=paste0("Homeownership Rates", focus.text),
-                            subtitle="Owns",
+                            title=paste0(indicator_title, focus.text),
+                            subtitle="Greater than or equal to 30 percent spent on rent",
                             source="U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)")
 }
 ```
@@ -496,12 +492,9 @@ facet_by_geography("Snohomish", ": Snohomish County")
 ### Line charts by geography
 #### High / low vulnerability
 ```{r, include=FALSE}
-#library(ggplot2)
-#library(scales)
-
 facet_line_by_geography_fixed <- function(geography, focus.text){
   # filter data
-  data_clean_geo <- data_clean_own %>% 
+  data_clean_geo <- data_clean_over %>% 
     filter(county==geography)
   
   # make chart, adjust estimate type, subtitle
@@ -513,17 +506,17 @@ facet_line_by_geography_fixed <- function(geography, focus.text){
                           dec=2,
                           scales="fixed",
                           ncol=3,
-                          title=paste0("Homeownership Rates", focus.text),
-                          subtitle="owns",
-                          source="U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)")+ 
-    ggplot2::scale_y_continuous(limits = c(0, 0.85))+
-    ggplot2::scale_y_continuous(labels = function(x) paste0(x*100 , "%")) 
-    #scale_y_continuous(limits = c(0, 30))
+                          title=paste0(indicator_title, focus.text),
+                          subtitle="Greater than or equal to 30 percent spent on rent",
+                          source="U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)")+
+    scale_y_continuous(limits = c(0, 0.9))+
+    scale_y_continuous(labels = function(x) paste0(x*100, "%"))
+    #scale_y_continuous(limits = c(0, 80))
 }
 
 facet_line_by_geography_free <- function(geography, focus.text){
   # filter data
-  data_clean_geo <- data_clean_own %>% 
+  data_clean_geo <- data_clean_over %>% 
     filter(county==geography)
   
   # make chart, adjust estimate type, subtitle
@@ -535,9 +528,11 @@ facet_line_by_geography_free <- function(geography, focus.text){
                           dec=2,
                           scales="free",
                           ncol=3,
-                          title=paste0("Homeownership Rates", focus.text),
-                          subtitle="owns",
-                          source="U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)")
+                          title=paste0(indicator_title, focus.text),
+                          subtitle="Greater than or equal to 30 percent spent on rent",
+                          source="U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)")+
+    scale_y_continuous(limits = c(0, 0.9))+
+    scale_y_continuous(labels = function(x) paste0(x*100, "%"))
     #scale_y_continuous(limits = c(0, 30))
 }
 ```
@@ -562,7 +557,7 @@ facet_line_by_geography_free("Snohomish", ": Snohomish County")
 The 5 geographies are all included in the facets by geography, but they could be separated out to create 5 individual charts - one for each geography.
 ```{r}
 dif_groups <- function(geography, group, category){
-  region_btgrp_dif <- data_clean_own %>% 
+  region_btgrp_dif <- data_clean_over %>% 
     # dplyr::filter(county==geography) %>% 
     dplyr::filter(focus_type==group) %>% 
     group_by(data_year) %>% 
@@ -594,8 +589,8 @@ dif_equity <- static_facet_line_chart(t=dif_equity_groups,
                                       dec=2,
                                       scales="fixed",
                                       ncol=3,
-                                      title=paste0("Homeownership Rates"),
-                                      subtitle="owns",
+                                      title=paste0(indicator_title),
+                                      subtitle="Greater than or equal to 30 percent",
                           source="U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)") #+ theme(legend.position = "none")
 
 dif_equity
@@ -606,7 +601,7 @@ dif_equity
 ```{r, include=FALSE}
 equity_group_facet_line <- function(focus.type, focus.text){
   # filter data
-  data_clean_filter <- data_clean_own %>% 
+  data_clean_filter <- data_clean_over %>% 
     filter(focus_type==focus.type)
   
   # make chart, adjust estimate type, subtitle, and y limits
@@ -618,10 +613,10 @@ equity_group_facet_line <- function(focus.type, focus.text){
                           dec=2,
                           scales="fixed",
                           ncol=3,
-                          title=paste0("Homeownership Rates", focus.text),
-                          subtitle="owns",
+                          title=paste0(indicator_title, focus.text),
+                          subtitle="Greater than or equal to 30 percent",
                           source="U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)") + 
-    ggplot2::scale_y_continuous(limits = c(0, 0.85))+
+    ggplot2::scale_y_continuous(limits = c(0, 0.90))+
     ggplot2::scale_y_continuous(labels = function(x) paste0(x*100 , "%")) 
 }
 ```
@@ -642,7 +637,7 @@ The 6 equity focus groups are all included in the facets by geography, but they 
 ```{r}
 dif_groups <- function(group, category){
 
-  btgrp_dif <- data_clean_own %>% 
+  btgrp_dif <- data_clean_over %>% 
     dplyr::filter(focus_type==group) %>% 
     group_by(data_year) %>% 
     mutate(dif = ifelse(focus_attribute!=category, fact_value - fact_value[focus_attribute == category], 0)) %>% 
@@ -673,8 +668,8 @@ dif_equity <- static_facet_line_chart(t=dif_equity_groups,
                                       dec=2,
                                       scales="fixed",
                                       ncol=3,
-                                      title=paste0("Homeownership Rates"),
-                                      subtitle="owns",
+                                      title=paste0(indicator_title),
+                                      subtitle="Greater than or equal to 30 percent",
                                       source="U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)") #+ theme(legend.position = "none")
 
 dif_equity
@@ -688,7 +683,7 @@ The code to make this is type of visual is long - adjust to indicator as needed 
 \
 ```{r, edu-attainment, fig.width=10}
 # get first and most recent years
-data_clean_df <- data_clean_own %>% 
+data_clean_df <- data_clean_over %>% 
   dplyr::filter(data_year_yr==2011 |
                   data_year_yr==2021) %>% 
   dplyr::filter(county=="Region")
@@ -755,8 +750,8 @@ p <- ggplot(data_clean_df, aes(fact_value, focus_attribute_ord)) +
        y=NULL,
        colour= "Year",
        shape="Year",
-       title = paste0("Homeownership Rates", ": Region"),
-       subtitle = "owns",
+       title = paste0(indicator_title, ": Region"),
+       subtitle = "Greater than 30 percent for households",
        caption=paste("U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)", "2011 disability data not available", sep = "\n")) +
   theme(plot.title = element_text(face="bold", size=16),
         axis.text.y = element_text(face = c('plain','bold', 'plain', 'bold',
@@ -810,7 +805,7 @@ p
 
 ### Line chart: all categories
 ```{r}
-data_clean_region <- data_clean_own %>% 
+data_clean_region <- data_clean_over %>% 
   dplyr::filter(county=="Region")
 
 line_chart <- static_line_chart(t=data_clean_region,
@@ -820,10 +815,10 @@ line_chart <- static_line_chart(t=data_clean_region,
                                 breaks = NULL,
                                 lwidth = 1,
                                 color = "psrc_pairs",
-                                title = "Homeownership Rates: Region",
-                                subtitle = "owns",
+                                title = "Housing cost burden: Region",
+                                subtitle = "Greater than or equal to 30 percent",
                                 source = "U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)") + 
-    ggplot2::scale_y_continuous(limits = c(0, 0.85))+
+    ggplot2::scale_y_continuous(limits = c(0, 0.90))+
     ggplot2::scale_y_continuous(labels = function(x) paste0(x*100 , "%")) 
 
 line_chart
@@ -835,11 +830,9 @@ line_chart <- interactive_line_chart(t=data_clean_region,
                                      breaks = NULL,
                                      lwidth = 1,
                                      color = "psrc_pairs",
-                                     title = "Homeownership Rates: Region",
-                                     subtitle = "owns",
-                                     source = "U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)") + 
-    ggplot2::scale_y_continuous(limits = c(0, 0.85))+
-    ggplot2::scale_y_continuous(labels = function(x) paste0(x*100 , "%")) 
+                                     title = "Housing cost burden: Region",
+                                     subtitle = "Greater than or equal to 30 percent",
+                                     source = "U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)")
 
 line_chart
 ```
@@ -853,10 +846,10 @@ static_facet_line_chart(t=data_clean_region,
                         dec=2,
                         scales="fixed",
                         ncol=3,
-                        title=paste0("Homeownership Rates",": Region"),
-                        subtitle="owns",
+                        title=paste0(indicator_title,": Region"),
+                        subtitle="Greater than or equal to 30 percent",
                         source="U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)")+ 
-    ggplot2::scale_y_continuous(limits = c(0, 0.85))+
+    ggplot2::scale_y_continuous(limits = c(0, 0.90))+
     ggplot2::scale_y_continuous(labels = function(x) paste0(x*100 , "%")) 
 ```
 \
