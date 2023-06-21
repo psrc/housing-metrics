@@ -509,8 +509,8 @@ facet_line_by_geography_fixed <- function(geography, focus.text){
                           title=paste0(indicator_title, focus.text),
                           subtitle="Greater than or equal to 30 percent spent on rent",
                           source="U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)")+
-    scale_y_continuous(limits = c(0, 0.9))+
-    scale_y_continuous(labels = function(x) paste0(x*100, "%"))
+    scale_y_continuous(limits = c(0, 0.90),
+                       labels = scales::percent)
     #scale_y_continuous(limits = c(0, 80))
 }
 
@@ -531,8 +531,8 @@ facet_line_by_geography_free <- function(geography, focus.text){
                           title=paste0(indicator_title, focus.text),
                           subtitle="Greater than or equal to 30 percent spent on rent",
                           source="U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)")+
-    scale_y_continuous(limits = c(0, 0.9))+
-    scale_y_continuous(labels = function(x) paste0(x*100, "%"))
+    scale_y_continuous(limits = c(0, 0.90),
+                       labels = scales::percent)
     #scale_y_continuous(limits = c(0, 30))
 }
 ```
@@ -615,9 +615,9 @@ equity_group_facet_line <- function(focus.type, focus.text){
                           ncol=3,
                           title=paste0(indicator_title, focus.text),
                           subtitle="Greater than or equal to 30 percent",
-                          source="U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)") + 
-    ggplot2::scale_y_continuous(limits = c(0, 0.90))+
-    ggplot2::scale_y_continuous(labels = function(x) paste0(x*100 , "%")) 
+                          source="U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)")+
+    scale_y_continuous(limits = c(0, 0.90),
+                       labels = scales::percent)
 }
 ```
 
@@ -817,9 +817,9 @@ line_chart <- static_line_chart(t=data_clean_region,
                                 color = "psrc_pairs",
                                 title = "Housing cost burden: Region",
                                 subtitle = "Greater than or equal to 30 percent",
-                                source = "U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)") + 
-    ggplot2::scale_y_continuous(limits = c(0, 0.90))+
-    ggplot2::scale_y_continuous(labels = function(x) paste0(x*100 , "%")) 
+                                source = "U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)")+
+    scale_y_continuous(limits = c(0, 0.90),
+                       labels = scales::percent)
 
 line_chart
 
@@ -848,9 +848,9 @@ static_facet_line_chart(t=data_clean_region,
                         ncol=3,
                         title=paste0(indicator_title,": Region"),
                         subtitle="Greater than or equal to 30 percent",
-                        source="U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)")+ 
-    ggplot2::scale_y_continuous(limits = c(0, 0.90))+
-    ggplot2::scale_y_continuous(labels = function(x) paste0(x*100 , "%")) 
+                        source="U.S. Census Bureau, American Community Survey (ACS) 5-Year Public Use Microdata Sample (PUMS)")+
+    scale_y_continuous(limits = c(0, 0.90),
+                       labels = scales::percent)
 ```
 \
 \
