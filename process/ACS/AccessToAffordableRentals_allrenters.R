@@ -10,7 +10,7 @@ library(dplyr)
 library(srvyr)
 library(fredr)
 
-year <- (2016)
+year <- (2021)
 inflation_year <- (2021)
 file_path <- "J:/Projects/V2050/Housing/Monitoring/2023Update/Access to Affordable Rental Housing/r_output.csv"
 
@@ -46,7 +46,7 @@ grossrent <- grossrent %>%
                                    !is.na(rr_score) ~ NA)))
 
 #------------ Median Renter HH Income ------------
-pums_raw <- get_psrc_pums(5,year,"h",c("TEN","HINCP"))
+pums_raw <- get_psrc_pums(5,year,"h",c("TEN","HINCP","GRNTP"))
 pums_raw <- real_dollars(pums_raw, inflation_year)
 
 # Create/modify variables
@@ -74,5 +74,9 @@ grossrent$affordable <- ifelse(incbyre_piv$Region >= grossrent$grossrent, 1,0)
 summarytbl <- data.frame(year)
 summarytbl$affordable <- sum(na.omit(grossrent$affordable))/nrow(na.omit(grossrent))
 
+#-------------- Region-wide Median Gross Rent --------------
+pums_rent <- pums_raw
+medianrent_region <- psrc_pums_median(pums_rent, "GRNTP2021", group_vars = c("DATA_YEAR"),rr=TRUE)
+
 #-------------- Write to Excel --------------
-write.csv(grossrent, file_path, row.names=FALSE)
+#write.csv(grossrent, file_path, row.names=FALSE)
