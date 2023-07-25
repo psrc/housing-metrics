@@ -399,10 +399,44 @@ Home Mortgage DIsclosure Act (HMDA) Database",
 race_21_bar
 ```
 
+```{r, create columns for specific charts/plots, plot 1b}
+
+# chart 1 - Loan Denial Rates by Race and Ethnicity (2022)
+
+region_race_22 <- region_clean[region_clean$race_ethnicity %in% c("American Indian or Alaska Native", "Asian",
+                                                                  "Black or African American", "Hispanic or Latino",
+                                                                  "Native Hawaiian or Other Pacific Islander",
+                                                                  "2 or more minority races", "White"), ] %>%
+  mutate(race_ethnicity= case_when(race_ethnicity == "Black or African American" ~ "Black",
+                                   race_ethnicity == "2 or more minority races" ~ "Two or more non-white races",
+                                   TRUE ~ as.character(race_ethnicity))) %>%
+  mutate(race_ethnicity = fct_relevel(race_ethnicity, 
+                                      "American Indian or Alaska Native", "Asian",
+                                      "Black", "Hispanic or Latino",
+                                      "Native Hawaiian or Other Pacific Islander",
+                                      "Two or more non-white races", "White")) %>%
+  filter(data_year == "2022")%>%
+  group_by(race_ethnicity)%>%
+  summarise(received=sum(received),
+            denied=(sum(denied)))
+
+region_race_22$share_denials_race <- region_race_22$denied/region_race_22$received
+
+race_22_bar <- static_bar_chart(t= region_race_22,
+                                x = "share_denials_race",
+                                y = "race_ethnicity",
+                                fill = "race_ethnicity",
+                                title = "Loan Denial Rates by Race and Ethnicity (2022)",
+                                subtitle = "Federal Financial Institutions Examination Council (FFIEC), 
+Home Mortgage DIsclosure Act (HMDA) Database",
+                                             color = "psrc_light")
+
+race_22_bar
+```
 
 ```{r, create columns for specific charts/plots, plot 2}
 
-# chart 2 - Time Series Loan Denial Rates by Race and Ethnicity (2018-2021)
+# chart 2 - Time Series Loan Denial Rates by Race and Ethnicity (2018-2022)
 
 region_POC <- region_clean %>% 
   mutate(POC = case_when(race_ethnicity == "White" ~"Non POC",
@@ -425,7 +459,7 @@ denial_race_line_chart <- static_line_chart(t= region_POC_calculate,
                                             breaks = NULL,
                                             lwidth = 1,
                                             color = "psrc_pairs",
-                                            title = "Loan Denial Rates by Race and Ethnicity (2018-2021)",
+                                            title = "Loan Denial Rates by Race and Ethnicity (2018-2022)",
                                             subtitle = "Federal Financial Institutions Examination Council (FFIEC), Home Mortgage Disclosure Act (HMDA) Database")
 
 
@@ -438,7 +472,7 @@ denial_race_line_chart <- interactive_line_chart(t= region_POC_calculate,
                                             breaks = NULL,
                                             lwidth = 1,
                                             color = "psrc_pairs",
-                                            title = "Loan Denial Rates by Race and Ethnicity (2018-2021)",
+                                            title = "Loan Denial Rates by Race and Ethnicity (2018-2022)",
                                             subtitle = "Federal Financial Institutions Examination Council (FFIEC), Home Mortgage Disclosure Act (HMDA) Database")
 
 
