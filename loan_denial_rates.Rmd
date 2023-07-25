@@ -13,6 +13,7 @@ library(httr)
 library(jsonlite)
 library(dplyr)
 library(tidyverse)
+library(ggplot2)
 
 #devtools::install_github("psrc/psrc.travelsurvey", force = TRUE)
 #devtools::install_github("psrc/psrccensus", force = TRUE)
@@ -364,9 +365,7 @@ region_clean <- rbind(region_clean_BSP, region_clean_SB, region_clean_TL)
 
 ```
 
-```{r, create columns for specific charts/plots, plot 1}
-
-# chart 1 - Loan Denial Rates by Race and Ethnicity (2021)
+```{r, create columns for specific charts/plots, chart 1 - Loan Denial Rates by Race and Ethnicity (2021)}
 
 region_race_21 <- region_clean[region_clean$race_ethnicity %in% c("American Indian or Alaska Native", "Asian",
                                                                   "Black or African American", "Hispanic or Latino",
@@ -399,9 +398,7 @@ Home Mortgage DIsclosure Act (HMDA) Database",
 race_21_bar
 ```
 
-```{r, create columns for specific charts/plots, plot 1b}
-
-# chart 1 - Loan Denial Rates by Race and Ethnicity (2022)
+```{r, chart 1 - Loan Denial Rates by Race and Ethnicity (2022)}
 
 region_race_22 <- region_clean[region_clean$race_ethnicity %in% c("American Indian or Alaska Native", "Asian",
                                                                   "Black or African American", "Hispanic or Latino",
@@ -434,55 +431,52 @@ Home Mortgage DIsclosure Act (HMDA) Database",
 race_22_bar
 ```
 
-```{r, create columns for specific charts/plots, plot 2}
-
-# chart 2 - Time Series Loan Denial Rates by Race and Ethnicity (2018-2022)
+```{r, chart 2 - Time Series Loan Denial Rates by Race and Ethnicity (2018-2022)}
 
 region_POC <- region_clean %>% 
-  mutate(POC = case_when(race_ethnicity == "White" ~"Non POC",
-         TRUE ~ "POC")) %>%
-  group_by(data_year, POC)%>%
+  mutate(POC_category = case_when(race_ethnicity == "White" ~"Non-POC",
+                         race_ethnicity == "Asian" ~"Asian POC",
+         TRUE ~ "Non-Asian POC")) %>%
+  group_by(data_year, POC_category)%>%
   summarise(received=sum(received),
-            denied=(sum(denied)))
+            denied=(sum(denied)))%>%
+  mutate(share_denials_race = denied/received)
 
 region_POC$data_year <- as.factor(region_POC$data_year)
 
-region_POC_calculate <- region_POC %>%
-  mutate(share_denials_race = denied/received)
-
 # time series line chart
 
-denial_race_line_chart <- static_line_chart(t= region_POC_calculate,
+denial_race_static_line <- static_line_chart(t= region_POC_calculate,
                                             x = "data_year", y = "share_denials_race",
-                                            fill = "POC",
+                                            fill = "POC_category",
                                             est = "percent",
                                             breaks = NULL,
                                             lwidth = 1,
                                             color = "psrc_pairs",
                                             title = "Loan Denial Rates by Race and Ethnicity (2018-2022)",
-                                            subtitle = "Federal Financial Institutions Examination Council (FFIEC), Home Mortgage Disclosure Act (HMDA) Database")
+                                            subtitle = "Federal Financial Institutions Examination Council (FFIEC), HMDA Database") +
+  scale_y_continuous(limits = c(0.09, 0.20),
+                       labels = scales::percent)
 
 
-denial_race_line_chart
+denial_race_static_line
 
-denial_race_line_chart <- interactive_line_chart(t= region_POC_calculate,
+denial_race_interactive_line <- interactive_line_chart(t= region_POC_calculate,
                                             x = "data_year", y = "share_denials_race",
-                                            fill = "POC",
+                                            fill = "POC_category",
                                             est = "percent",
+                                            dec = 1,
                                             breaks = NULL,
                                             lwidth = 1,
                                             color = "psrc_pairs",
                                             title = "Loan Denial Rates by Race and Ethnicity (2018-2022)",
-                                            subtitle = "Federal Financial Institutions Examination Council (FFIEC), Home Mortgage Disclosure Act (HMDA) Database")
+                                            subtitle = "Federal Financial Institutions Examination Council (FFIEC),  HMDA Database")
 
-
-denial_race_line_chart
+denial_race_interactive_line
 
 ```
 
-```{r, create columns for specific charts/plots, plot 1}
-
-# chart 3 - Loan Denial Rates by Income and Race/Ethnicity (2021)
+```{r, chart 3 - Loan Denial Rates by Income and Race/Ethnicity (2022)}
 
 region_21 <- region_clean[region_clean$race_ethnicity %in% c("White", "Asian","Black or African American",
                                                              "Hispanic or Latino"), ] %>%
