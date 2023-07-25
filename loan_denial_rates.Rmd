@@ -1,0 +1,529 @@
+---
+title: "loan_denial_rates"
+author: "Meg Grzybowski"
+date: "2023-07-24"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+
+library(magrittr)
+library(data.table)
+library(httr)
+library(jsonlite)
+library(dplyr)
+library(tidyverse)
+
+# packages that are from github that host functions for pulling data (do the install in R Gui, not RStudio)
+
+#devtools::install_github("psrc/psrc.travelsurvey", force = TRUE)
+#devtools::install_github("psrc/psrccensus", force = TRUE)
+#devtools::install_github("psrc/psrcplot", force = TRUE)
+#devtools::install_github("psrc/psrctrends", force = TRUE)
+
+# run these after installing github changes through R Gui
+
+library(psrc.travelsurvey)
+library(psrccensus)
+library(psrcplot)
+library(psrctrends)
+
+install_psrc_fonts()
+```
+
+```{r, Helper attributes / functions from Michael, eval = FALSE}
+
+races_vector <- c("Asian",                                                                         # Races listed on HMDA
+                  "Black or African American",
+                  "Hispanic or Latino",
+                  "White")                                                                        # Re-code spaces, etc.
+
+# run these after installing github changes through R Gui
+
+poc_vector <- paste0(races_vector[c(1:3,5:6,9)], collapse=",") %>% c("White") %>%
+  lapply(URLencode)
+
+ethnicities_vector <- c("Hispanic or Latino",
+                       "Not Hispanic or Latino",
+                       "Joint",
+                       "Ethnicity Not Available",
+                       "Free Form Text Only") 
+```
+
+# set to eval = FALSE, but when adding a new year, insert new data pull - but only for that year!
+
+# When pulling in new years:
+
+## download the csv
+## rename the file in new location
+## open file and remove top two rows
+## add a column to the left which becomes your new 'A' column and copy the income indicators from previous years into that column
+
+```{r, csv download, eval = FALSE}
+setwd('J:/Projects/V2050/Housing/Monitoring/2023Update')
+network_file_loc<-'J:/Projects/V2050/Housing/Monitoring/2023Update/Loan Denials- FFIEC'
+
+# Pull csv in from site and download ------- 2018
+BremSilverPOrchard_raw_18 <- read.csv(file.path(network_file_loc, '2018/MSAMD14740_BremertonSilverdalePortOrchard2018.csv'))
+SeattleBellevue_raw_18 <- read.csv(file.path(network_file_loc, '2018/MSAMD42644_SeattleBellevueKent2018.csv'))
+TacomaLake_raw_18 <- read.csv(file.path(network_file_loc, '2018/MSAMD45104_TacomaLakewood2018.csv'))
+
+# Pull csv in from site and download ------- 2019
+BremSilverPOrchard_raw_19 <- read.csv(file.path(network_file_loc, '2019/MSAMD14740_BremertonSilverdalePortOrchard2019.csv'))
+SeattleBellevue_raw_19 <- read.csv(file.path(network_file_loc, '2019/MSAMD42644_SeattleBellevueKent2019.csv'))
+TacomaLake_raw_19 <- read.csv(file.path(network_file_loc, '2019/MSAMD45104_TacomaLakewood2019.csv'))
+
+# Pull csv in from site and download ------- 2020
+BremSilverPOrchard_raw_20 <- read.csv(file.path(network_file_loc, '2020/MSAMD14740_BremertonSilverdalePortOrchard2020.csv'))
+SeattleBellevue_raw_20 <- read.csv(file.path(network_file_loc, '2020/MSAMD42644_SeattleBellevueKent2020.csv'))
+TacomaLake_raw_20 <- read.csv(file.path(network_file_loc, '2020/MSAMD45104_TacomaLakewood2020.csv'))
+
+# Pull csv in from site and download ------- 2021
+BremSilverPOrchard_raw_21 <- read.csv(file.path(network_file_loc, '2021/MSAMD14740_BremertonSilverdalePortOrchard2021.csv'))
+SeattleBellevue_raw_21 <- read.csv(file.path(network_file_loc, '2021/MSAMD42644_SeattleBellevueKent2021.csv'))
+TacomaLake_raw_21 <- read.csv(file.path(network_file_loc, '2021/MSAMD45104_TacomaLakewood2021.csv'))
+
+# Pull csv in from site and download ------- 2022
+BremSilverPOrchard_raw_22 <- read.csv(file.path(network_file_loc, '2022/MSAMD14740_BremertonSilverdalePortOrchard2022.csv'))
+SeattleBellevue_raw_22 <- read.csv(file.path(network_file_loc, '2022/MSAMD42644_SeattleBellevueKent2022.csv'))
+TacomaLake_raw_22 <- read.csv(file.path(network_file_loc, '2022/MSAMD45104_TacomaLakewood2022.csv'))
+```
+
+```{r, cleaning data files, BremeSilverPortOrchard, 2018-2022}
+
+#-----2018-----------------------------------
+
+BremSilverPOrchard_clean18 <- BremSilverPOrchard_raw_18[-c(1, 2, 3, 13, 19, 20, 30, 36, 37, 47, 53, 54, 64, 70, 71, 81), c(1, 2, 3, 9)] %>%
+  rename("race_ethnicity" ="INCOME..RACE.AND.ETHNICITY",
+         "received" = "Applications.Received", 
+         "denied" = "Applications.Denied",
+         "median_income" = "X")
+
+# change from character to numeric for calculation of share denials
+BremSilverPOrchard_clean18$denied <- as.numeric(as.character(BremSilverPOrchard_clean18$denied))
+BremSilverPOrchard_clean18$received <- as.numeric(as.character(BremSilverPOrchard_clean18$received))
+
+# reorganize data and include data year
+BremSilverPOrchard_clean18$share_denials_race <- BremSilverPOrchard_clean18$denied/BremSilverPOrchard_clean18$received
+BremSilverPOrchard_clean18$data_year <- 2018
+BremSilverPOrchard_clean18$region <- "BremSilverPOrchard"
+BremSilverPOrchard_clean18 <- BremSilverPOrchard_clean18[c(6, 7, 1, 2, 3, 4, 5)]
+
+#-----2019-----------------------------------
+
+BremSilverPOrchard_clean19 <- BremSilverPOrchard_raw_19[-c(1, 2, 3, 13, 19, 20, 30, 36, 37, 47, 53, 54, 64, 70, 71, 81), c(1, 2, 3, 9)] %>%
+  rename("race_ethnicity" ="INCOME..RACE.AND.ETHNICITY",
+         "received" = "Applications.Received", 
+         "denied" = "Applications.Denied",
+         "median_income" = "X")
+
+# change from character to numeric for calculation of share denials
+BremSilverPOrchard_clean19$denied <- as.numeric(as.character(BremSilverPOrchard_clean19$denied))
+BremSilverPOrchard_clean19$received <- as.numeric(as.character(BremSilverPOrchard_clean19$received))
+
+# reorganize data and include data year
+BremSilverPOrchard_clean19$share_denials_race <- BremSilverPOrchard_clean19$denied/BremSilverPOrchard_clean19$received
+BremSilverPOrchard_clean19$data_year <- 2019
+BremSilverPOrchard_clean19$region <- "BremSilverPOrchard"
+BremSilverPOrchard_clean19 <- BremSilverPOrchard_clean19[c(6, 7, 1, 2, 3, 4, 5)]
+
+#-----2020-----------------------------------
+
+BremSilverPOrchard_clean20 <- BremSilverPOrchard_raw_20[-c(1, 2, 3, 13, 19, 20, 30, 36, 37, 47, 53, 54, 64, 70, 71, 81), c(1, 2, 3, 9)] %>%
+  rename("race_ethnicity" ="INCOME..RACE.AND.ETHNICITY",
+         "received" = "Applications.Received", 
+         "denied" = "Applications.Denied",
+         "median_income" = "X")
+
+# change from character to numeric for calculation of share denials
+BremSilverPOrchard_clean20$denied <- as.numeric(as.character(BremSilverPOrchard_clean20$denied))
+BremSilverPOrchard_clean20$received <- as.numeric(as.character(BremSilverPOrchard_clean20$received))
+
+# reorganize data and include data year
+BremSilverPOrchard_clean20$share_denials_race <- BremSilverPOrchard_clean20$denied/BremSilverPOrchard_clean20$received
+BremSilverPOrchard_clean20$data_year <- 2020
+BremSilverPOrchard_clean20$region <- "BremSilverPOrchard"
+BremSilverPOrchard_clean20 <- BremSilverPOrchard_clean20[c(6, 7, 1, 2, 3, 4, 5)]
+
+#-----2021-----------------------------------
+
+# remove extra columns
+BremSilverPOrchard_clean21 <- BremSilverPOrchard_raw_21[-c(1, 2, 3, 13, 19, 20, 30, 36, 37, 47, 53, 54, 64, 70, 71, 81), c(1, 2, 3, 9)] %>%
+  rename("race_ethnicity" ="INCOME..RACE.AND.ETHNICITY",
+         "received" = "Applications.Received", 
+         "denied" = "Applications.Denied",
+         "median_income" = "X")
+
+# change from character to numeric for calculation of share denials
+BremSilverPOrchard_clean21$denied <- as.numeric(as.character(BremSilverPOrchard_clean21$denied))
+BremSilverPOrchard_clean21$received <- as.numeric(as.character(BremSilverPOrchard_clean21$received))
+
+# reorganize data and include data year
+BremSilverPOrchard_clean21$share_denials_race <- BremSilverPOrchard_clean21$denied/BremSilverPOrchard_clean21$received
+BremSilverPOrchard_clean21$data_year <- 2021
+BremSilverPOrchard_clean21$region <- "BremSilverPOrchard"
+BremSilverPOrchard_clean21 <- BremSilverPOrchard_clean21[c(6, 7, 1, 2, 3, 4, 5)]
+
+#-----2022-----------------------------------
+
+BremSilverPOrchard_clean22 <- BremSilverPOrchard_raw_22[-c(1, 2, 3, 13, 19, 20, 30, 36, 37, 47, 53, 54, 64, 70, 71, 81), c(1, 2, 3, 9)] %>%
+  rename("race_ethnicity" ="INCOME..RACE.AND.ETHNICITY",
+         "received" = "Applications.Received", 
+         "denied" = "Applications.Denied",
+         "median_income" = "X")
+
+# change from character to numeric for calculation of share denials
+BremSilverPOrchard_clean22$denied <- as.numeric(as.character(BremSilverPOrchard_clean22$denied))
+BremSilverPOrchard_clean22$received <- as.numeric(as.character(BremSilverPOrchard_clean22$received))
+
+# reorganize data and include data year
+BremSilverPOrchard_clean22$share_denials_race <- BremSilverPOrchard_clean22$denied/BremSilverPOrchard_clean22$received
+BremSilverPOrchard_clean22$data_year <- 2022
+BremSilverPOrchard_clean22$region <- "BremSilverPOrchard"
+BremSilverPOrchard_clean22 <- BremSilverPOrchard_clean22[c(6, 7, 1, 2, 3, 4, 5)]
+
+region_clean_BSP <- rbind(BremSilverPOrchard_clean18, BremSilverPOrchard_clean19, BremSilverPOrchard_clean20, BremSilverPOrchard_clean21,
+                          BremSilverPOrchard_clean22)
+
+```
+
+```{r, cleaning data files, SeattleBellevue, 2018-2022}
+#-----2018-----------------------------------
+
+Seattle_Bellevue_clean18 <- SeattleBellevue_raw_18[-c(1, 2, 3, 13, 19, 20, 30, 36, 37, 47, 53, 54, 64, 70, 71, 81), c(1, 2, 3, 9)] %>%
+  rename("race_ethnicity" ="INCOME..RACE.AND.ETHNICITY",
+         "received" = "Applications.Received", 
+         "denied" = "Applications.Denied",
+         "median_income" = "X")
+
+# change from character to numeric for calculation of share denials
+Seattle_Bellevue_clean18$denied <- as.numeric(as.character(Seattle_Bellevue_clean18$denied))
+Seattle_Bellevue_clean18$received <- as.numeric(as.character(Seattle_Bellevue_clean18$received))
+
+# reorganize data and include data year
+Seattle_Bellevue_clean18$share_denials_race <- Seattle_Bellevue_clean18$denied/Seattle_Bellevue_clean18$received
+Seattle_Bellevue_clean18$data_year <- 2018
+Seattle_Bellevue_clean18$region <- "Seattle_Bellevue"
+Seattle_Bellevue_clean18 <- Seattle_Bellevue_clean18[c(6, 7, 1, 2, 3, 4, 5)]
+
+#-----2019-----------------------------------
+
+Seattle_Bellevue_clean19 <- SeattleBellevue_raw_19[-c(1, 2, 3, 13, 19, 20, 30, 36, 37, 47, 53, 54, 64, 70, 71, 81), c(1, 2, 3, 9)] %>%
+  rename("race_ethnicity" ="INCOME..RACE.AND.ETHNICITY",
+         "received" = "Applications.Received", 
+         "denied" = "Applications.Denied",
+         "median_income" = "X")
+
+# change from character to numeric for calculation of share denials
+Seattle_Bellevue_clean19$denied <- as.numeric(as.character(Seattle_Bellevue_clean19$denied))
+Seattle_Bellevue_clean19$received <- as.numeric(as.character(Seattle_Bellevue_clean19$received))
+
+# reorganize data and include data year
+Seattle_Bellevue_clean19$share_denials_race <- Seattle_Bellevue_clean19$denied/Seattle_Bellevue_clean19$received
+Seattle_Bellevue_clean19$data_year <- 2019
+Seattle_Bellevue_clean19$region <- "Seattle_Bellevue"
+Seattle_Bellevue_clean19 <- Seattle_Bellevue_clean19[c(6, 7, 1, 2, 3, 4, 5)]
+
+#-----2020-----------------------------------
+
+Seattle_Bellevue_clean20 <- SeattleBellevue_raw_20[-c(1, 2, 3, 13, 19, 20, 30, 36, 37, 47, 53, 54, 64, 70, 71, 81), c(1, 2, 3, 9)] %>%
+  rename("race_ethnicity" ="INCOME..RACE.AND.ETHNICITY",
+         "received" = "Applications.Received", 
+         "denied" = "Applications.Denied",
+         "median_income" = "X")
+
+# change from character to numeric for calculation of share denials
+Seattle_Bellevue_clean20$denied <- as.numeric(as.character(Seattle_Bellevue_clean20$denied))
+Seattle_Bellevue_clean20$received <- as.numeric(as.character(Seattle_Bellevue_clean20$received))
+
+# reorganize data and include data year
+Seattle_Bellevue_clean20$share_denials_race <- Seattle_Bellevue_clean20$denied/Seattle_Bellevue_clean20$received
+Seattle_Bellevue_clean20$data_year <- 2020
+Seattle_Bellevue_clean20$region <- "Seattle_Bellevue"
+Seattle_Bellevue_clean20 <- Seattle_Bellevue_clean20[c(6, 7, 1, 2, 3, 4, 5)]
+
+#-----2021-----------------------------------
+
+# remove extra columns
+Seattle_Bellevue_clean21 <- SeattleBellevue_raw_21[-c(1, 2, 3, 13, 19, 20, 30, 36, 37, 47, 53, 54, 64, 70, 71, 81), c(1, 2, 3, 9)] %>%
+  rename("race_ethnicity" ="INCOME..RACE.AND.ETHNICITY",
+         "received" = "Applications.Received", 
+         "denied" = "Applications.Denied",
+         "median_income" = "X")
+
+# change from character to numeric for calculation of share denials
+Seattle_Bellevue_clean21$denied <- as.numeric(as.character(Seattle_Bellevue_clean21$denied))
+Seattle_Bellevue_clean21$received <- as.numeric(as.character(Seattle_Bellevue_clean21$received))
+
+# reorganize data and include data year
+Seattle_Bellevue_clean21$share_denials_race <- Seattle_Bellevue_clean21$denied/Seattle_Bellevue_clean21$received
+Seattle_Bellevue_clean21$data_year <- 2021
+Seattle_Bellevue_clean21$region <- "Seattle_Bellevue"
+Seattle_Bellevue_clean21 <- Seattle_Bellevue_clean21[c(6, 7, 1, 2, 3, 4, 5)]
+
+#-----2022-----------------------------------
+
+Seattle_Bellevue_clean22 <- SeattleBellevue_raw_22[-c(1, 2, 3, 13, 19, 20, 30, 36, 37, 47, 53, 54, 64, 70, 71, 81), c(1, 2, 3, 9)] %>%
+  rename("race_ethnicity" ="INCOME..RACE.AND.ETHNICITY",
+         "received" = "Applications.Received", 
+         "denied" = "Applications.Denied",
+         "median_income" = "X")
+
+# change from character to numeric for calculation of share denials
+Seattle_Bellevue_clean22$denied <- as.numeric(as.character(Seattle_Bellevue_clean22$denied))
+Seattle_Bellevue_clean22$received <- as.numeric(as.character(Seattle_Bellevue_clean22$received))
+
+# reorganize data and include data year
+Seattle_Bellevue_clean22$share_denials_race <- Seattle_Bellevue_clean22$denied/Seattle_Bellevue_clean22$received
+Seattle_Bellevue_clean22$data_year <- 2022
+Seattle_Bellevue_clean22$region <- "Seattle_Bellevue"
+Seattle_Bellevue_clean22 <- Seattle_Bellevue_clean22[c(6, 7, 1, 2, 3, 4, 5)]
+
+region_clean_SB <- rbind(Seattle_Bellevue_clean18, Seattle_Bellevue_clean19, Seattle_Bellevue_clean20, Seattle_Bellevue_clean21,
+                          Seattle_Bellevue_clean22)
+
+#write.csv(SeattleBellevue_clean, "Loan Denials- FFIEC/r_output 2021 1-year.csv", row.names=FALSE)
+```
+
+```{r, cleaning data filers, TacomaLakewood, 2018-2022}
+#-----2018-----------------------------------
+
+TacomaLake_clean18 <- TacomaLake_raw_18[-c(1, 2, 3, 13, 19, 20, 30, 36, 37, 47, 53, 54, 64, 70, 71, 81), c(1, 2, 3, 9)] %>%
+  rename("race_ethnicity" ="INCOME..RACE.AND.ETHNICITY",
+         "received" = "Applications.Received", 
+         "denied" = "Applications.Denied",
+         "median_income" = "X")
+
+# change from character to numeric for calculation of share denials
+TacomaLake_clean18$denied <- as.numeric(as.character(TacomaLake_clean18$denied))
+TacomaLake_clean18$received <- as.numeric(as.character(TacomaLake_clean18$received))
+
+# reorganize data and include data year
+TacomaLake_clean18$share_denials_race <- TacomaLake_clean18$denied/TacomaLake_clean18$received
+TacomaLake_clean18$data_year <- 2018
+TacomaLake_clean18$region <- "TacomaLake"
+TacomaLake_clean18 <- TacomaLake_clean18[c(6, 7, 1, 2, 3, 4, 5)]
+
+#-----2019-----------------------------------
+
+TacomaLake_clean19 <- TacomaLake_raw_19[-c(1, 2, 3, 13, 19, 20, 30, 36, 37, 47, 53, 54, 64, 70, 71, 81), c(1, 2, 3, 9)] %>%
+  rename("race_ethnicity" ="INCOME..RACE.AND.ETHNICITY",
+         "received" = "Applications.Received", 
+         "denied" = "Applications.Denied",
+         "median_income" = "X")
+
+# change from character to numeric for calculation of share denials
+TacomaLake_clean19$denied <- as.numeric(as.character(TacomaLake_clean19$denied))
+TacomaLake_clean19$received <- as.numeric(as.character(TacomaLake_clean19$received))
+
+# reorganize data and include data year
+TacomaLake_clean19$share_denials_race <- TacomaLake_clean19$denied/TacomaLake_clean19$received
+TacomaLake_clean19$data_year <- 2019
+TacomaLake_clean19$region <- "TacomaLake"
+TacomaLake_clean19 <- TacomaLake_clean19[c(6, 7, 1, 2, 3, 4, 5)]
+
+#-----2020-----------------------------------
+
+TacomaLake_clean20 <- TacomaLake_raw_20[-c(1, 2, 3, 13, 19, 20, 30, 36, 37, 47, 53, 54, 64, 70, 71, 81), c(1, 2, 3, 9)] %>%
+  rename("race_ethnicity" ="INCOME..RACE.AND.ETHNICITY",
+         "received" = "Applications.Received", 
+         "denied" = "Applications.Denied",
+         "median_income" = "X")
+
+# change from character to numeric for calculation of share denials
+TacomaLake_clean20$denied <- as.numeric(as.character(TacomaLake_clean20$denied))
+TacomaLake_clean20$received <- as.numeric(as.character(TacomaLake_clean20$received))
+
+# reorganize data and include data year
+TacomaLake_clean20$share_denials_race <- TacomaLake_clean20$denied/TacomaLake_clean20$received
+TacomaLake_clean20$data_year <- 2020
+TacomaLake_clean20$region <- "TacomaLake"
+TacomaLake_clean20 <- TacomaLake_clean20[c(6, 7, 1, 2, 3, 4, 5)]
+
+#-----2021-----------------------------------
+
+# remove extra columns
+TacomaLake_clean21 <- TacomaLake_raw_21[-c(1, 2, 3, 13, 19, 20, 30, 36, 37, 47, 53, 54, 64, 70, 71, 81), c(1, 2, 3, 9)] %>%
+  rename("race_ethnicity" ="INCOME..RACE.AND.ETHNICITY",
+         "received" = "Applications.Received", 
+         "denied" = "Applications.Denied",
+         "median_income" = "X")
+
+# change from character to numeric for calculation of share denials
+TacomaLake_clean21$denied <- as.numeric(as.character(TacomaLake_clean21$denied))
+TacomaLake_clean21$received <- as.numeric(as.character(TacomaLake_clean21$received))
+
+# reorganize data and include data year
+TacomaLake_clean21$share_denials_race <- TacomaLake_clean21$denied/TacomaLake_clean21$received
+TacomaLake_clean21$data_year <- 2021
+TacomaLake_clean21$region <- "TacomaLake"
+TacomaLake_clean21 <- TacomaLake_clean21[c(6, 7, 1, 2, 3, 4, 5)]
+
+#-----2022-----------------------------------
+
+TacomaLake_clean22 <- TacomaLake_raw_22[-c(1, 2, 3, 13, 19, 20, 30, 36, 37, 47, 53, 54, 64, 70, 71, 81), c(1, 2, 3, 9)] %>%
+  rename("race_ethnicity" ="INCOME..RACE.AND.ETHNICITY",
+         "received" = "Applications.Received", 
+         "denied" = "Applications.Denied",
+         "median_income" = "X")
+
+# change from character to numeric for calculation of share denials
+TacomaLake_clean22$denied <- as.numeric(as.character(TacomaLake_clean22$denied))
+TacomaLake_clean22$received <- as.numeric(as.character(TacomaLake_clean22$received))
+
+# reorganize data and include data year
+TacomaLake_clean22$share_denials_race <- TacomaLake_clean22$denied/TacomaLake_clean22$received
+TacomaLake_clean22$data_year <- 2022
+TacomaLake_clean22$region <- "TacomaLake"
+TacomaLake_clean22 <- TacomaLake_clean22[c(6, 7, 1, 2, 3, 4, 5)]
+
+region_clean_TL <- rbind(TacomaLake_clean18, TacomaLake_clean19, TacomaLake_clean20, TacomaLake_clean21,
+                          TacomaLake_clean22)
+```
+
+```{r, join datasets across region}
+
+region_clean <- rbind(region_clean_BSP, region_clean_SB, region_clean_TL)
+
+```
+
+```{r, create columns for specific charts/plots, plot 1}
+
+# chart 1 - Loan Denial Rates by Race and Ethnicity (2021)
+
+region_race_21 <- region_clean[region_clean$race_ethnicity %in% c("American Indian or Alaska Native", "Asian",
+                                                                  "Black or African American", "Hispanic or Latino",
+                                                                  "Native Hawaiian or Other Pacific Islander",
+                                                                  "2 or more minority races", "White"), ] %>%
+  mutate(race_ethnicity= case_when(race_ethnicity == "Black or African American" ~ "Black",
+                                   race_ethnicity == "2 or more minority races" ~ "Two or more non-white races",
+                                   TRUE ~ as.character(race_ethnicity))) %>%
+  mutate(race_ethnicity = fct_relevel(race_ethnicity, 
+                                      "American Indian or Alaska Native", "Asian",
+                                      "Black", "Hispanic or Latino",
+                                      "Native Hawaiian or Other Pacific Islander",
+                                      "Two or more non-white races", "White")) %>%
+  group_by(race_ethnicity)%>%
+  summarise(received=sum(received),
+            denied=(sum(denied)))
+
+region_race_21$share_denials_race <- region_race_21$denied/region_race_21$received
+
+race_21_bar <- static_bar_chart(t= region_race_21,
+                                x = "share_denials_race",
+                                y = "race_ethnicity",
+                                fill = "race_ethnicity",
+                                title = "Loan Denial Rates by Race and Ethnicity (2021)",
+                                subtitle = "Federal Financial Institutions Examination Council (FFIEC), 
+Home Mortgage DIsclosure Act (HMDA) Database",
+                                             color = "psrc_light")
+
+race_21_bar
+```
+
+
+```{r, create columns for specific charts/plots, plot 2}
+
+# chart 2 - Time Series Loan Denial Rates by Race and Ethnicity (2018-2021)
+
+region_POC <- region_clean %>% 
+  mutate(POC = case_when(race_ethnicity == "White" ~"Non POC",
+         TRUE ~ "POC")) %>%
+  group_by(data_year, POC)%>%
+  summarise(received=sum(received),
+            denied=(sum(denied)))
+
+region_POC$data_year <- as.factor(region_POC$data_year)
+
+region_POC_calculate <- region_POC %>%
+  mutate(share_denials_race = denied/received)
+
+#first_col_vals <-  c("less than 50%", "50-79%", "80-99%", "100-119%", "120% or more")
+
+# arranged by factor order
+#region_POC_reorder <- region_POC_calculate %>% 
+ # mutate(median_income = factor(median_income, levels = first_col_vals)) %>% 
+  #arrange(median_income)
+
+# time series line chart
+
+denial_race_line_chart <- static_line_chart(t= region_POC_calculate,
+                                            x = "data_year", y = "share_denials_race",
+                                            fill = "POC",
+                                            est = "percent",
+                                            breaks = NULL,
+                                            lwidth = 1,
+                                            color = "psrc_pairs",
+                                            title = "Loan Denial Rates by Race and Ethnicity (2018-2021)",
+                                            subtitle = "Federal Financial Institutions Examination Council (FFIEC), Home Mortgage Disclosure Act (HMDA) Database")
+
+
+denial_race_line_chart
+
+denial_race_line_chart <- interactive_line_chart(t= region_POC_calculate,
+                                            x = "data_year", y = "share_denials_race",
+                                            fill = "POC",
+                                            est = "percent",
+                                            breaks = NULL,
+                                            lwidth = 1,
+                                            color = "psrc_pairs",
+                                            title = "Loan Denial Rates by Race and Ethnicity (2018-2021)",
+                                            subtitle = "Federal Financial Institutions Examination Council (FFIEC), Home Mortgage Disclosure Act (HMDA) Database")
+
+
+denial_race_line_chart
+
+```
+
+```{r, create columns for specific charts/plots, plot 1}
+
+# chart 3 - Loan Denial Rates by Income and Race/Ethnicity (2021)
+
+region_21 <- region_clean[region_clean$race_ethnicity %in% c("White", "Asian","Black or African American",
+                                                             "Hispanic or Latino"), ] %>%
+  mutate(median_income = fct_relevel(median_income, 
+                                     "less than 50%", "50-79%", "80-99%", "100-119%", "120% or more")) %>%
+  group_by(median_income, race_ethnicity)%>%
+  summarise(received=sum(received),
+            denied=(sum(denied)))
+
+region_21$share_denials_race <- region_21$denied/region_21$received
+
+region_21$data_year <- 2021
+region_21$region <- "Region"
+region_21 <- region_21[c(6, 7, 1, 2, 3, 4, 5)]
+
+race_income_21_column <- static_column_chart(t= region_21,
+                                             x = "median_income",
+                                             y = "share_denials_race",
+                                             fill = "race_ethnicity",
+                                             title = "Loan Denial Rates by Income Bracket and Race/Ethnicity (2021)",
+                                             subtitle = "Federal Financial Institutions Examination Council (FFIEC), 
+Home Mortgage Disclosure Act (HMDA) Database",
+                                             color = "psrc_light")
+
+race_income_21_column
+
+
+```
+
+```{r, create columns for specific charts/plots}
+
+facet_chart <- static_facet_line_chart(t=region_clean,
+                        x="data_year", y= "share_denials_race",
+                        fill="data_year", facet="median_income",
+                        color="psrc_light",
+                        est ="percent",
+                        scales="fixed")
+
+facet_chart
+
+```
+
+```{r, Export data}
+
+#work_book <- createWorkbook()
+#addWorksheet(work_book, sheetName = "median sale price")
+#writeData(work_book, "median sale price", county_piv)
+#saveWorkbook(work_book, file = "Affordability Measures/r_output median_price_county.xlsx", overwrite = TRUE)
+```
