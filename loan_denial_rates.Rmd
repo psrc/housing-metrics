@@ -365,7 +365,8 @@ region_clean <- rbind(region_clean_BSP, region_clean_SB, region_clean_TL)
 
 ```
 
-```{r, create columns for specific charts/plots, chart 1 - Loan Denial Rates by Race and Ethnicity (2021)}
+#lines 369-400 are to double check data and have been commented out
+```{r, create columns for specific charts/plots, chart 1 - Loan Denial Rates by Race and Ethnicity (2021), eval = FALSE}
 
 region_race_21 <- region_clean[region_clean$race_ethnicity %in% c("American Indian or Alaska Native", "Asian",
                                                                   "Black or African American", "Hispanic or Latino",
@@ -478,38 +479,35 @@ denial_race_interactive_line
 
 ```{r, chart 3 - Loan Denial Rates by Income and Race/Ethnicity (2022)}
 
-region_21 <- region_clean[region_clean$race_ethnicity %in% c("White", "Asian","Black or African American",
+region_22_income_race <- region_clean[region_clean$race_ethnicity %in% c("White", "Asian","Black or African American",
                                                              "Hispanic or Latino"), ] %>%
   mutate(median_income = fct_relevel(median_income, 
                                      "less than 50%", "50-79%", "80-99%", "100-119%", "120% or more")) %>%
+  filter(data_year == "2022") %>%
   group_by(median_income, race_ethnicity)%>%
   summarise(received=sum(received),
             denied=(sum(denied)))
 
-region_21$share_denials_race <- region_21$denied/region_21$received
+region_22_income_race$share_denials_race <- region_22_income_race$denied/region_22_income_race$received
+region_22_income_race$region <- "Region"
 
-region_21$data_year <- 2021
-region_21$region <- "Region"
-region_21 <- region_21[c(6, 7, 1, 2, 3, 4, 5)]
-
-race_income_21_column <- static_column_chart(t= region_21,
+race_income_22_column <- static_column_chart(t= region_22_income_race,
                                              x = "median_income",
                                              y = "share_denials_race",
                                              fill = "race_ethnicity",
-                                             title = "Loan Denial Rates by Income Bracket and Race/Ethnicity (2021)",
-                                             subtitle = "Federal Financial Institutions Examination Council (FFIEC), 
-Home Mortgage Disclosure Act (HMDA) Database",
+                                             title = "Loan Denial Rates by Income Bracket and Race/Ethnicity (2022)",
+                                             subtitle = "Federal Financial Institutions Examination Council (FFIEC), HMDA Database",
                                              color = "psrc_light")
 
-race_income_21_column
-
+race_income_22_column
 
 ```
 
-```{r, Export data, eval = FALSE}
+```{r, Export data option, eval = FALSE}
 
 #work_book <- createWorkbook()
 #addWorksheet(work_book, sheetName = "median sale price")
 #writeData(work_book, "median sale price", county_piv)
 #saveWorkbook(work_book, file = "Affordability Measures/r_output median_price_county.xlsx", overwrite = TRUE)
+
 ```
