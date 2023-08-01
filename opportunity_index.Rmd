@@ -20,20 +20,25 @@ knitr::opts_chunk$set(echo=FALSE,
 
 ```{r, packages}
 
-library(tidyverse)
-library(tidycensus)
 library(DBI)
+library(odbc)
 library(magrittr)
 library(data.table)
 library(httr)
 library(jsonlite)
 library(dplyr)
-library(plyr)
 library(openxlsx)
+
 library(psrccensus)
 library(psrc.travelsurvey)
 library(psrcplot)
+library(psrctrends)
+
+library(tidyverse)
+library(tidycensus)
 library(fastmap)
+
+install_psrc_fonts()
 ```
 
 # getting census population data by tract -- mary/eric
@@ -50,7 +55,7 @@ tracts_21 <- get_acs_recs(geography ='tract',
 acs_re_21 <- tracts_21 %>%
   filter(variable %in% c("B03002_001", "B03002_003", "B03002_004", "B03002_005", "B03002_006", "B03002_007", "B03002_008", "B03002_009",
                        "B03002_010", "B03002_011", "B03002_012")) %>%
-  mutate(.keep = "none",
+  dplyr::mutate(.keep = "none",
          geoid20 = GEOID,
          count = estimate,
          count_moe = moe, 
@@ -61,7 +66,7 @@ acs_re_21 <- tracts_21 %>%
 # create/modify variables
 # str detect will go in order
 acs_re_new <- acs_re_21 %>% 
-  mutate(race_ethnicity = case_when(str_detect(race_ethnicity, "American Indian") ~"AIAN",
+  dplyr:: mutate(race_ethnicity = case_when(str_detect(race_ethnicity, "American Indian") ~"AIAN",
                                     str_detect(race_ethnicity, "Asian") ~"Asian",
                                     str_detect(race_ethnicity, "Black") ~"Black/African American",
                                     str_detect(race_ethnicity, "Native Hawaiian") ~"NHOPI",
@@ -70,10 +75,11 @@ acs_re_new <- acs_re_21 %>%
                                     str_detect(race_ethnicity, "White") ~"White",
                                     str_detect(race_ethnicity, "Hispanic or Latino") ~"Hispanic/Latinx",
                                     str_detect(race_ethnicity, "Total") ~"Total")) %>%
-  group_by(geoid20, census_tract, race_ethnicity) %>%
-  summarize(count = sum(count, na.rm = TRUE),
+  dplyr::group_by(geoid20, census_tract, race_ethnicity) %>%
+  dplyr::summarise(count = sum(count, na.rm = TRUE),
             moe = moe_sum(count_moe, estimate = count, na.rm = TRUE))%>%
-  filter(race_ethnicity != "Total")
+  dplyr::filter(race_ethnicity != "Total")
+
 ```
 
 # Opportunity Index data set
@@ -187,11 +193,22 @@ opp_index_column <- static_column_chart(t= acs_comb_low_verylow,
                                         x = "race_ethnicity", y = "share",
                                         fill = "opp_index",
                                         pos = "stack",
-                                        #moe = "share_moe",                         #including moe will remove bar labels, one or the other
+                                        #moe = "share_moe",    #including moe will remove bar labels, one or the other
                                         title = "Opportunity Index",
                                         color = "psrc_pairs") 
 
-opp_index_column
+opp_index_column # stacked with labels
+
+opp_index_column_moe <- static_column_chart(t= acs_comb_low_verylow,
+                                        x = "race_ethnicity", y = "share",
+                                        fill = "opp_index",
+                                        pos = "dodge",
+                                        moe = "share_moe",    #including moe will remove bar labels, one or the other
+                                        #dec = 1, 
+                                        title = "Opportunity Index",
+                                        color = "psrc_pairs") 
+
+opp_index_column_moe
 ```
 
 # write to Excel
