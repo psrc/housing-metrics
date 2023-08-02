@@ -183,13 +183,13 @@ risk_comb_mod_high$share_moe <- risk_comb_mod_high$count_moe/risk_comb_mod_high$
 
 # 6. rearrange
 risk_comb_mod_high <- risk_comb_mod_high[c(1, 2, 3, 4, 6, 8, 5, 7)]%>%
-  mutate(opp_index = fct_relevel(opp_index, "Very Low", "Low"))
+  mutate(risk_level_name = fct_relevel(risk_level_name, "higher", "moderate"))
   
 ```
 
 ```{r, displacement risk chart with moe}
 
-disp_risk_column <- static_column_chart(t= risk_mod_high,
+disp_risk_column <- static_column_chart(t= risk_comb_mod_high,
                                         x = "race_ethnicity", y = "share",
                                         fill = "risk_level_name",
                                         pos = "stack",
@@ -199,7 +199,7 @@ disp_risk_column <- static_column_chart(t= risk_mod_high,
 
 disp_risk_column # stacked with labels
 
-disp_risk_column_moe <- static_column_chart(t= risk_mod_high,
+disp_risk_column_moe <- static_column_chart(t= risk_comb_mod_high,
                                         x = "race_ethnicity", y = "share",
                                         fill = "risk_level_name",
                                         pos = "dodge",
