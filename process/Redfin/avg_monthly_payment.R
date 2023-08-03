@@ -11,16 +11,15 @@ library(stringr)
 library(dplyr)
 
 # assumptions
-
 earliestdate <- "2012-06-01"
 latestdate <- "2023-06-30"
 
 term <- 360                     # 30 year mortgage
-downpayment <- 0.035            # same as in JCHS State of The Nation's Housing 2023 Report
+downpayment <- 0.035            # same as JCHS State of The Nation's Housing 2023 Report
 propertytax <- 0.01             # King County is 1%, Snohomish County is 0.89%
-propertyins <- 0.0035          
-mortgageins <- 0.0085          
-maxdebttoincome <- 0.31        
+propertyins <- 0.0035           # same as JCHS         
+mortgageins <- 0.0085           # same as JCHS         
+maxdebttoincome <- 0.31         # same as JCHS   
 
 interest_url <- "https://www.freddiemac.com/pmms/docs/historicalweeklydata.xlsx"
 value_url <- "https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_market_tracker/redfin_metro_market_tracker.tsv000.gz"
