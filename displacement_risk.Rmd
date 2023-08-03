@@ -1,0 +1,220 @@
+---
+title: "Displacement Risk Index by Race/Ethnicity"
+subtitle: "Data sources: ACS, 5-year 2017-2021"
+author: "Meg Grzybowski"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_depth: 6
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo=FALSE, 
+                      warning=FALSE, 
+                      message=FALSE)
+```
+
+```{r, packages}
+
+library(DBI)
+library(odbc)
+library(magrittr)
+library(data.table)
+library(httr)
+library(jsonlite)
+library(dplyr)
+library(openxlsx)
+
+library(psrccensus)
+library(psrc.travelsurvey)
+library(psrcplot)
+library(psrctrends)
+
+library(tidyverse)
+library(tidycensus)
+library(fastmap)
+
+install_psrc_fonts()
+```
+
+# getting census population data by tract -- mary/eric
+# https://github.com/psrc/housing-metrics/blob/main/process/ACS/AccessToAffordableRentals_RE.R
+```{r, pull ACS data}
+
+tracts_21 <- get_acs_recs(geography ='tract', 
+                             table.names = 'B03002', 
+                             years = 2021, 
+                             counties = c("King", "Kitsap", "Pierce", "Snohomish"),
+                             acs.type = 'acs5')
+
+# refine table
+acs_re_21 <- tracts_21 %>%
+  filter(variable %in% c("B03002_001", "B03002_003", "B03002_004", "B03002_005", "B03002_006", "B03002_007", "B03002_008", "B03002_009",
+                       "B03002_010", "B03002_011", "B03002_012")) %>%
+  mutate(.keep = "none",
+         geoid20 = GEOID,
+         count = estimate,
+         count_moe = moe, 
+         race_ethnicity = label,
+         census_tract = name,
+         survey = year)
+
+# create/modify variables
+# str detect will go in order
+acs_re_new <- acs_re_21 %>% 
+  mutate(race_ethnicity = case_when(str_detect(race_ethnicity, "American Indian") ~"AIAN",
+                                    str_detect(race_ethnicity, "Asian") ~"Asian",
+                                    str_detect(race_ethnicity, "Black") ~"Black/African American",
+                                    str_detect(race_ethnicity, "Native Hawaiian") ~"NHOPI",
+                                    str_detect(race_ethnicity, "Some other") ~"Other or Multiple Races",
+                                    str_detect(race_ethnicity, "Two or more") ~"Other or Multiple Races",
+                                    str_detect(race_ethnicity, "White") ~"White",
+                                    str_detect(race_ethnicity, "Hispanic or Latino") ~"Hispanic/Latinx",
+                                    str_detect(race_ethnicity, "Total") ~"Total")) %>%
+  group_by(geoid20, census_tract, race_ethnicity) %>%
+  summarize(count = sum(count, na.rm = TRUE),
+            moe = moe_sum(count_moe, estimate = count, na.rm = TRUE))%>%
+  filter(race_ethnicity != "Total")
+```
+
+# Displacement Risk data set
+```{r, Displacement risk}
+
+# connect to Elmer
+elmer_connection <- dbConnect(odbc::odbc(),
+  driver = "SQL Server",
+  server = "AWS-PROD-SQL\\Sockeye",
+  database = "Elmer",
+  trusted_connection = "yes"
+  )
+
+devtools::install_github("psrc/psrcelmer")
+library(psrcelmer)
+displacement_layer <- st_read_elmergeo('displacement_2018')
+
+# crosswalk the Displacement Risk data with the ACS r/e data with 10_20 crosswalk
+# crosswalk between census tracts 2010-2020 because data from WTN is using 2010 census geographies while the spatial data (with population estimates) are using 2020 geographies
+crosswalk_10_20 <- dbReadTable(elmer_connection, SQL("census.v_geo_relationships_tracts"))
+
+# join base 2010 data
+displacement_crosswalk <- merge(crosswalk_10_20, displacement_layer,
+                               by.x="geoid10",
+                               by.y="geoid10", 
+                               all.x=TRUE)
+
+# join base 2020 data
+displacement_acs_21 <- merge(acs_re_new, displacement_crosswalk,
+                             by.x="geoid20",
+                             by.y="geoid20", 
+                             all.x=TRUE) %>%
+  filter(county_name %in% c("King", "Kitsap","Pierce", "Snohomish")) %>%
+  filter(risk_level_name %in% c("higher", "moderate", "lower")) 
+                       
+displacement_acs_21$race_ethnicity <- factor(displacement_acs_21$race_ethnicity,
+                                            levels = c("AIAN",
+                                                       "Asian",
+                                                       "Black/African American",
+                                                       "Hispanic/Latinx",
+                                                       "NHOPI",
+                                                       "Other or Multiple Races",
+                                                       "White"))
+
+
+displacement_acs_21_new <- subset(displacement_acs_21, select = c("geoid20", "census_tract", "race_ethnicity", "county_name",
+                                                                "count", "moe", "risk_level_name", "total_pop10"))
+```
+
+```{r, plot rankings with MOE}
+
+displacement_risk %>%
+  group_by(name1, year) %>%
+  mutate(denom = var1[name2 == "ALL"]) %>%
+  mutate(var1_share = var1/denom)
+
+# 1. create a subset table that calculates: the total count of each race/ethnicity for the region
+risk_race_totals <- displacement_acs_21_new %>%
+  group_by(race_ethnicity)%>%
+  summarise(count=sum(count),
+            count_moe=(sum(moe))) %>%
+  mutate(race_ethnicity = case_when(str_detect(race_ethnicity, "AIAN") ~ "AIAN Total",
+                                    str_detect(race_ethnicity, "Asian") ~"Asian Total",
+                                    str_detect(race_ethnicity, "Black/African American") ~"Black/African American Total",
+                                    str_detect(race_ethnicity, "Hispanic/Latinx") ~"Hispanic/Latinx Total",
+                                    str_detect(race_ethnicity, "NHOPI") ~"NHOPI Total",
+                                    str_detect(race_ethnicity, "Other or Multiple Races") ~"Other or Multiple Races Total",
+                                    str_detect(race_ethnicity, "White") ~"White Total"))
+
+# 2a. create a table with the race/ethnicity for each displacement risk rating
+acs_race_risk <- displacement_acs_21_new %>%
+  group_by(race_ethnicity, risk_level_name)%>%
+  summarise(count=sum(count),
+            count_moe=(sum(moe)))
+
+# 2b. only select the Moderate and Higher indices
+risk_mod_high <- subset(acs_race_risk, risk_level_name == "moderate" | risk_level_name == "higher")
+
+# 2c. combine the totals for the region and table 2b. so that you can calculate the MOE for each race/ethnicity
+## NOTE: when pulling in new data, you will need to change the numbers to reflect new table 1. values ##
+risk_comb_mod_high <- risk_mod_high %>%
+  add_column(total_region_count_RE = rep(c(25294, 584144, 235994, 441362, 35108, 584394, 2620877), each = 2), 
+             .after = 'count_moe')
+
+# 3. calculate share of race/ethnicity
+risk_comb_mod_high$share <- risk_comb_mod_high$count/risk_comb_mod_high$total_region_count_RE
+
+# 4. create a subset table that calculates: the total count of those in the Moderate/Higher indices
+disp_race_risk_high <- risk_mod_high %>%
+  group_by(risk_level_name)%>%
+  summarise(count_risk=sum(count))
+
+# 4b. insert values into new column
+## NOTE: when pulling in new data, you will need to change the numbers to reflect new table 3. values, alternating every other ##
+risk_comb_mod_high <- risk_comb_mod_high %>%
+  add_column(total_risk_index = rep(c(458370, 1391342, 458370, 1391342, 458370, 1391342, 458370, 1391342, 458370, 1391342, 458370, 1391342, 
+                                     458370, 1391342)), 
+             .after = 'share')
+
+# 5. calculate share_moe
+risk_comb_mod_high$share_moe <- risk_comb_mod_high$count_moe/risk_comb_mod_high$total_risk_index
+
+# 6. rearrange
+risk_comb_mod_high <- risk_comb_mod_high[c(1, 2, 3, 4, 6, 8, 5, 7)]%>%
+  mutate(risk_level_name = fct_relevel(risk_level_name, "higher", "moderate"))
+  
+```
+
+```{r, displacement risk chart with moe}
+
+disp_risk_column <- static_column_chart(t= risk_comb_mod_high,
+                                        x = "race_ethnicity", y = "share",
+                                        fill = "risk_level_name",
+                                        pos = "stack",
+                                        #moe = "share_moe",    #including moe will remove bar labels, one or the other
+                                        title = "Opportunity Index",
+                                        color = "psrc_pairs") 
+
+disp_risk_column # stacked with labels
+
+disp_risk_column_moe <- static_column_chart(t= risk_comb_mod_high,
+                                        x = "race_ethnicity", y = "share",
+                                        fill = "risk_level_name",
+                                        pos = "dodge",
+                                        moe = "share_moe",    #including moe will remove bar labels, one or the other
+                                        #dec = 1, 
+                                        title = "Opportunity Index",
+                                        color = "psrc_pairs") 
+
+disp_risk_column_moe
+```
+# write to Excel
+```{r, write to excel}
+# can change the output path when updating yearly information
+
+setwd("J:/Projects/V2050/Housing/Monitoring/2023Update")
+
+write.csv(displacement_acs_21_new, "Displacement Risk - ACS/r_output 2021 5YR NEW.csv", row.names=FALSE)
+```
