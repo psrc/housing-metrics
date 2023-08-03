@@ -63,7 +63,7 @@ value <- redfin_raw %>%
 value <- value %>%
   filter(property_type == "All Residential")
 value <- with(value, value[(date >= earliestdate & date <= latestdate), ])
-value <- subset(value, select = c(date,median_sale_price))
+value <- subset(value, select = c(date,median_sale_price,property_type))
 value$month <- str_sub(value$date, 1, 7)
 
 # ---------------- JOIN DATA & ANALYZE ----------------
@@ -80,3 +80,25 @@ analysis$mortgageins_mnthlypymt = analysis$loan_amt * mortgageins / 12
 
 analysis$payment = analysis$loan_amt * analysis$mthlyrate * ((analysis$r + 1) / analysis$r) + (analysis$propertytax_mnthlypymt + analysis$propertyins_mnthlypymt + analysis$mortgageins_mnthlypymt)
 analysis$reqincome = (analysis$payment / maxdebttoincome) * 12
+
+# ---------------- GRAPHING ----------------
+library(ggplot2)
+
+pymt_int_plot <- ggplot(analysis)  + 
+  geom_bar(aes(x=date, y=payment),stat="identity", fill="skyblue2",colour="#ffffff")+
+  geom_line(aes(x=date, y=int_rate*1000),stat="identity",color="grey40", size=1)+
+  labs(title= "Average Monthly Mortgage vs. Interest Rates",
+       x="Year",y="Monthly Mortgage") +
+  scale_y_continuous(sec.axis=sec_axis(~.*0.001,name="Interest Rate (%)")) +
+  scale_x_date(breaks = scales::breaks_width("2 year")) +
+  theme(text = element_text(size = 20)) 
+pymt_int_plot
+
+
+reqincome_plot <- ggplot(analysis)  + 
+  geom_line(aes(x=date, y=reqincome),stat="identity",color="grey40", size=1)+
+  labs(title= "Income Required to Buy Median Home",
+       x="Year",y="Income ($)") +
+  scale_x_date(breaks = scales::breaks_width("2 year")) +
+  theme(text = element_text(size = 20)) 
+reqincome_plot
