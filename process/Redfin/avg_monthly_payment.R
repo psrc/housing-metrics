@@ -1,7 +1,7 @@
 # TITLE: Average Mortgage Payment
 # GEOGRAPHIES: King and Snohomish Only (limited by Redfin)
 # DATA SOURCE: Redfin, FreddieMac
-# DATE MODIFIED: 8.2.2023
+# DATE MODIFIED: 8.3.2023
 # AUTHOR: Eric Clute
 
 library(openxlsx)
@@ -15,14 +15,12 @@ library(dplyr)
 earliestdate <- "2012-06-01"
 latestdate <- "2023-06-30"
 
-term <- "360"                   # 30 year mortgage
-downpayment <- "0.035"           # same as in JCHS State of The Nation's Housing 2023 Report
-propertytax <- "1%"             # King County is 1%, Snohomish County is 0.89%
-propertyins <- "0.35%"          
-mortgageins <- "0.85%"          
-maxdebttoincome <- "31%"        
-
-
+term <- 360                     # 30 year mortgage
+downpayment <- 0.035            # same as in JCHS State of The Nation's Housing 2023 Report
+propertytax <- 0.01             # King County is 1%, Snohomish County is 0.89%
+propertyins <- 0.0035          
+mortgageins <- 0.0085          
+maxdebttoincome <- 0.31        
 
 interest_url <- "https://www.freddiemac.com/pmms/docs/historicalweeklydata.xlsx"
 value_url <- "https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_market_tracker/redfin_metro_market_tracker.tsv000.gz"
@@ -69,16 +67,17 @@ value <- with(value, value[(date >= earliestdate & date <= latestdate), ])
 value <- subset(value, select = c(date,median_sale_price))
 value$month <- str_sub(value$date, 1, 7)
 
-# ---------------- JOIN DATA ----------------
+# ---------------- JOIN DATA & ANALYZE ----------------
 
 analysis <- value %>% left_join(int)
 
 analysis$mthlyrate <- analysis$int_rate / 100 / 12
-analysis$r <- (1 + analysis$mthlyrate) ^ 360 - 1
-analysis$payment = (analysis$median_sale_price - (downpayment * median_sale_price)) * mthlyrate * ((r + 1) / r)
+analysis$r <- (1 + analysis$mthlyrate) ^ term - 1
+analysis$loan_amt = analysis$median_sale_price - (downpayment * analysis$median_sale_price)
 
+analysis$propertytax_mnthlypymt = analysis$loan_amt * propertytax / 12
+analysis$propertyins_mnthlypymt = analysis$loan_amt * propertyins / 12
+analysis$mortgageins_mnthlypymt = analysis$loan_amt * mortgageins / 12
 
-
-
-
-
+analysis$payment = analysis$loan_amt * analysis$mthlyrate * ((analysis$r + 1) / analysis$r) + (analysis$propertytax_mnthlypymt + analysis$propertyins_mnthlypymt + analysis$mortgageins_mnthlypymt)
+analysis$reqincome = (analysis$payment / maxdebttoincome) * 12
