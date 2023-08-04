@@ -14,6 +14,9 @@ library(dplyr)
 earliestdate <- "2012-06-01"
 latestdate <- "2023-06-30"
 
+smalltbl_earliestdate <- "2021-06-01"
+smalltbl_latestdate <- "2023-06-30"
+
 term <- 360                     # 30 year mortgage
 downpayment <- 0.035            # same as JCHS State of The Nation's Housing 2023 Report
 propertytax <- 0.01             # King County is 1%, Snohomish County is 0.89%
@@ -67,7 +70,6 @@ value <- subset(value, select = c(date,median_sale_price,property_type))
 value$month <- str_sub(value$date, 1, 7)
 
 # ---------------- JOIN DATA & ANALYZE ----------------
-
 analysis <- value %>% left_join(int)
 
 analysis$mthlyrate <- analysis$int_rate / 100 / 12
@@ -80,6 +82,11 @@ analysis$mortgageins_mnthlypymt = analysis$loan_amt * mortgageins / 12
 
 analysis$payment = analysis$loan_amt * analysis$mthlyrate * ((analysis$r + 1) / analysis$r) + (analysis$propertytax_mnthlypymt + analysis$propertyins_mnthlypymt + analysis$mortgageins_mnthlypymt)
 analysis$reqincome = (analysis$payment / maxdebttoincome) * 12
+
+# ---------------- SMALL TABLE FOR EXPORT ----------------
+#smalltbl <- with(analysis, analysis[(date >= smalltbl_earliestdate & date <= smalltbl_latestdate), ])
+
+
 
 # ---------------- GRAPHING ----------------
 library(ggplot2)
