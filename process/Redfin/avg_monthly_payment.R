@@ -9,6 +9,7 @@ library(tidyr)
 library(tidyverse)
 library(stringr)
 library(dplyr)
+library(psrccensus)
 
 # assumptions
 earliestdate <- "2012-06-01"
@@ -18,10 +19,10 @@ smalltbl_earliestdate <- "2021-06-01"
 smalltbl_latestdate <- "2023-06-30"
 
 term <- 360                     # 30 year mortgage
-downpayment <- 0.035            # same as JCHS State of The Nation's Housing 2023 Report
+downpayment <- 0.20             # JCHS report used 3.5% but I will use 20% for now
 propertytax <- 0.01             # King County is 1%, Snohomish County is 0.89%
 propertyins <- 0.0035           # same as JCHS         
-mortgageins <- 0.0085           # same as JCHS         
+mortgageins <- 0.00             # set to 0 for 20% downpayment         
 maxdebttoincome <- 0.31         # same as JCHS   
 
 interest_url <- "https://www.freddiemac.com/pmms/docs/historicalweeklydata.xlsx"
@@ -109,3 +110,30 @@ reqincome_plot <- ggplot(analysis)  +
   scale_x_date(breaks = scales::breaks_width("2 year")) +
   theme(text = element_text(size = 20)) 
 reqincome_plot
+
+
+# ---------------- FIRST TIME HOME BUYERS ----------------
+
+# Assumptions
+downpayment <- 0.10             # Matches WCRER
+ft_hb_income <- 0.80            # WCRER used 75% of AMI, we will use 80%
+mortgageins <- 0.0085           # Matches JCHS report for all buyers in US
+
+years <- c(2012,2021)
+inflation_year <- (2021)
+
+# Pull income data from PUMS
+median_hhincome_func <- function(year){
+  pums_raw <- get_psrc_pums(5,year,"h",c("HINCP"))
+  pums_raw <- real_dollars(pums_raw, inflation_year)
+  pums <- pums_raw
+  
+  incbyre <- psrc_pums_median(pums, "HINCP2021", group_vars = "DATA_YEAR",rr=TRUE)
+  
+  incbyre <- incbyre %>% rename("HINCP_median" = "HINCP2021_median")
+  incbyre <- incbyre %>% rename("HINCP_median_moe" = "HINCP2021_median_moe")
+}
+
+# Run function -----------
+median_hhincome <- map(years, ~median_hhincome_func(.x)) %>%
+  reduce(bind_rows)
