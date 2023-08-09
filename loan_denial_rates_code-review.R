@@ -11,10 +11,11 @@ library(psrcplot)
 library(psrctrends)
 install_psrc_fonts()
 
+# removed dplyr & ggplot2 because already included with tidyverse
 
 network_file_loc<-'J:/Projects/V2050/Housing/Monitoring/2023Update/Loan Denials- FFIEC'
 
-# download csvs ----
+# read csvs ----
 
 years <- 2018:2022
 
@@ -55,4 +56,10 @@ for(g in 1:length(geogs)) {
   # bind all cleaned tables and store in master list; name is recycled from geogs element names.
   dfs[[names(geogs)[g]]]<- rbindlist(temp_dfs) 
 }
+
+# to use tables ----
+
+dfs$bsp
+dfs$sb
+dfs$tl
 
