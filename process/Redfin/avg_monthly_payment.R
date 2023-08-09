@@ -104,7 +104,7 @@ pymt_int_plot <- ggplot(analysis)  +
   geom_line(aes(x=date, y=int_rate*1000),stat="identity",color="grey40", size=1)+
   labs(title= paste(metro_area, " - Mortgage for Median Home"),
        x="Year",y="Monthly Mortgage") +
-  scale_y_continuous(sec.axis=sec_axis(~.*0.001,name="Interest Rate (%)")) +
+  scale_y_continuous(labels=function(x) format(x, big.mark = ",", scientific = FALSE),sec.axis=sec_axis(~.*0.001,name="Interest Rate (%)")) +
   scale_x_date(breaks = scales::breaks_width("2 year")) +
   theme(text = element_text(size = 20)) 
 pymt_int_plot
@@ -115,7 +115,7 @@ reqincome_plot <- ggplot(analysis)  +
   labs(title= paste(metro_area, " - Mortgage for Median Home"),
        x="Year",y="Minimum Income Required($)") +
   scale_x_date(breaks = scales::breaks_width("2 year")) +
-  scale_y_continuous(limits = c(0,375000),labels=function(x) format(x, big.mark = ",", scientific = FALSE)) +
+  scale_y_continuous(limits = c(0,350000),labels=function(x) format(x, big.mark = ",", scientific = FALSE)) +
   theme(text = element_text(size = 20)) 
 reqincome_plot
 
