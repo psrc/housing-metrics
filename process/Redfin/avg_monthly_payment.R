@@ -1,7 +1,7 @@
 # TITLE: Average Mortgage Payment
 # GEOGRAPHIES: King and Snohomish Only (limited by Redfin)
 # DATA SOURCE: Redfin, FreddieMac
-# DATE MODIFIED: 8.8.2023
+# DATE MODIFIED: 8.10.2023
 # AUTHOR: Eric Clute
 
 library(openxlsx)
@@ -23,7 +23,7 @@ smalltbl_earliestdate <- "2021-06-01"
 smalltbl_latestdate <- "2023-06-30"
 
 term <- 360                     # 30 year mortgage
-downpayment <- 0.20             # JCHS report used 3.5% but I will use 20% for now
+downpayment <- 0.20             # JCHS report used 3.5% but I will use 20% given our market conditions
 propertytax <- 0.01             # King County is 1%, Snohomish County is 0.89%
 propertyins <- 0.0035           # same as JCHS         
 mortgageins <- 0.00             # set to 0 for 20% downpayment         
@@ -92,9 +92,7 @@ smalltbl <- with(analysis, analysis[(date >= smalltbl_earliestdate & date <= sma
 smalltbl <- subset(smalltbl, str_sub(smalltbl$date, -5,-1) == str_sub(smalltbl_earliestdate, -5,-1))
 smalltbl <- subset(smalltbl, select = c(date, int_rate, median_sale_price, payment, reqincome))
 smalltbl <- smalltbl %>% arrange(ymd(smalltbl$date))
-
-# smalltbl %>% pivot_wider(names_from = c('date'),
-#                          values_from = c('median_sale_price'))
+smalltbl <- t(smalltbl)
 
 # ---------------- GRAPHING ----------------
 library(ggplot2)
@@ -115,34 +113,6 @@ reqincome_plot <- ggplot(analysis)  +
   labs(title= paste(metro_area, " - Mortgage for Median Home"),
        x="Year",y="Minimum Income Required($)") +
   scale_x_date(breaks = scales::breaks_width("2 year")) +
-  scale_y_continuous(limits = c(0,350000),labels=function(x) format(x, big.mark = ",", scientific = FALSE)) +
+  scale_y_continuous(limits = c(0,200000),labels=function(x) format(x, big.mark = ",", scientific = FALSE)) +
   theme(text = element_text(size = 20)) 
 reqincome_plot
-
-
-# ---------------- FIRST TIME HOME BUYERS ----------------
-
-# Assumptions
-# downpayment <- 0.10             # Matches WCRER
-# ft_hb_income <- 0.80            # WCRER used 75% of AMI, we will use 80%
-# mortgageins <- 0.0085           # Matches JCHS report for all buyers in US
-# 
-# years <- c(2012,2013,2014,2015,2016,2017,2018,2019,2021)
-# inflation_year <- (2021)
-# 
-# # Pull income data from PUMS
-# median_hhincome_func <- function(year){
-#   pums_raw <- get_psrc_pums(1,year,"h",c("HINCP"))
-#   pums_raw <- real_dollars(pums_raw, inflation_year)
-#   pums <- pums_raw
-#   
-#   incbyre <- psrc_pums_median(pums, "HINCP2021", group_vars = "DATA_YEAR",rr=TRUE)
-#   
-#   incbyre <- incbyre %>% rename("HINCP_median" = "HINCP2021_median")
-#   incbyre <- incbyre %>% rename("HINCP_median_moe" = "HINCP2021_median_moe")
-#   incbyre <- subset(incbyre, DATA_YEAR != "Total")
-# }
-# 
-# # Run function -----------
-# median_hhincome <- map(years, median_hhincome_func) %>%
-#   reduce(bind_rows)
