@@ -1,0 +1,175 @@
+---
+title: "census-permits-msa"
+author: "suzanne"
+date: "2023-08-11"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+In this task we need to download Excel-based and text based monthly Census reports of residential permit activity by MSA, and assembling the data for our two MSAs (Seattle-Tacoma-Bellevue and Bremerton-Silverdale-Port Orchard) into a consolidated monthly time-series dataset. 
+
+Prior to Nov-2019, the files are text based, then switch to excel.
+
+```{r}
+library(readxl)
+library(httr)
+library(dplyr)
+library(psrcplot)
+library(ggplot2)
+library(openxlsx)
+library(stringr)
+install_psrc_fonts()
+
+```
+
+## Get the data from January 2019 to November 2019 from text files
+
+A bunch of specific unchanging parts of the file and url:
+```{r}
+col_names<-c("CSA", "CBSA", "Name", "Total", "1 Unit", "2 Units",
+           "3 and 4 Units", "5 Units or More", 
+           "Num of Structures With 5 Units or More", "Monthly Coverage Percent*", "Month")
+
+url_start<-'https://www.census.gov/construction/bps/txt/tb3u2019'
+url_end<-'.txt'
+month_ids<-c('01', '02', '03', '04', '05', '06', '07', '08', '09', '10')
+num_cols<-c("CSA", "CBSA","Total", "1 Unit", "2 Units",
+           "3 and 4 Units", "5 Units or More", 
+           "Num of Structures With 5 Units or More", "Monthly Coverage Percent*")
+```
+
+Get the data and clean it up
+```{r}
+download_clean_text<-function(url, month_id,colnames){
+    big_tbl<-read.fwf(url, skip=11, header=FALSE, widths=c(3,6,40,8,8,8,8,8,8,8))
+    
+    # Select the region's MSA; the Bremerton one is 
+    #spread across two lines and needs to be cleaned up
+    psrc_msa_tbl<-big_tbl[c(47, 48,321),]
+    
+    col_names_no_month<-head(col_names, -1)
+    
+    
+    psrc_msa_tbl<-setNames(psrc_msa_tbl, col_names_no_month)
+    #clean up the Bremerton MSA data
+    psrc_msa_tbl[1, 4:10]=psrc_msa_tbl[2,4:10]
+    psrc_msa_tbl_clean<-psrc_msa_tbl[-2,]
+    psrc_msa_tbl_clean$Month=paste0(2019,month_id)
+return(psrc_msa_tbl_clean) 
+}
+
+```
+
+
+put the months together
+```{r}
+df_2019<-data.frame(matrix(nrow = 0, ncol = length(col_names)))
+colnames(df_2019)<-col_names
+
+for(month_id in month_ids){
+  url<-paste0(url_start, month_id, url_end)
+  the_month_df<-download_clean_text(url, month_id,colnames)
+  df_2019<-rbind(df_2019,the_month_df)
+}
+```
+
+```{r}
+
+# for being consistent with later datasets
+df_2019<-df_2019%>%mutate_at(num_cols,as.numeric)%>%
+  select(-c("Monthly Coverage Percent*"))
+```
+
+#Part two: Get data from November 2019 to June 2023
+
+
+```{r}
+month_ids<-c('01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12')
+yr_ids<-c('2020', '2021', '2022')
+
+months_2019<-c('11','12')
+months_2023<-c('01', '02', '03', '04', '05', '06')
+
+month_yr_ids<-as.list(outer(yr_ids, month_ids, paste0))
+months_2019_ids<-as.list(outer('2019', months_2019, paste0))
+months_2023_ids<-as.list(outer('2023', months_2023, paste0))
+month_yr_ids<-c(months_2019_ids,month_yr_ids,months_2023_ids)
+url_start<-'https://www.census.gov/construction/bps/xls/msamonthly_'
+url_end<-'.xls'
+
+```
+
+```{r}
+download_clean_excel<-function(url, month_id, months_19_ids){
+
+    GET(url, write_disk(tf<-tempfile(fileext=".xls")))
+  # sheet names changed after 2019
+    if(month_id %in% months_2019_ids){
+      sheetName='Units'}
+    else{
+      sheetName='MSA Units'
+    }
+  
+    big_tbl<-read_excel(tf, sheet=sheetName,range='A8:I377')
+    
+    psrc_msa_tbl_clean<-big_tbl%>%filter(Name %in% c('Seattle-Tacoma-Bellevue, WA', 'Bremerton-Silverdale-Port Orchard, WA'  ))
+    psrc_msa_tbl_clean$Month=month_id
+return(psrc_msa_tbl_clean) 
+}
+```
+
+
+
+
+
+```{r}
+col_names<-col_names[names(col_names)!="Monthly Coverage Percent*"]
+df_new<-data.frame(matrix(nrow = 0, ncol = length(col_names)))
+colnames(df_new)<-col_names
+
+
+for(month_id in month_yr_ids){
+  url<-paste0(url_start, month_id, url_end)
+  print(url)
+  the_month_df<-download_clean_excel(url, month_id, months_19_ids)
+  df_new<-rbind(df_new,the_month_df)
+}
+```
+
+
+```{r}
+df_all<-rbind(df_2019, df_new)
+```
+
+```{r}
+df_all<-df_all%>%mutate(MSA_Name=str_trim(Name))
+
+```
+
+```{r}
+write.xlsx(df_all, 'census_bps_monthly.xlsx')
+```
+
+```{r}
+static_line_chart(t=df_all, x='Month', y='Total', fill='MSA_Name',title='Total Permits by Month Nov 2019-June 2023' )+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+ theme(legend.position = "bottom")
+```
+```{r}
+static_line_chart(t=df_all, x='Month', y='1 Unit', fill='MSA_Name',  title='1 Unit Permits by Month Nov 2019-June 2023')+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+ theme(legend.position = "bottom")
+```
+
+```{r}
+static_line_chart(t=df_all, x='Month', y='2 Units', fill='MSA_Name',title='2 Unit Permits by Month Nov 2019-June 2023')+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+ theme(legend.position = "bottom")
+```
+
+```{r}
+static_line_chart(t=df_all, x='Month', y='3 and 4 Units', fill='MSA_Name', title='3 and 4 Unit Permits by Month Nov 2019-June 2023')+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+ theme(legend.position = "bottom")
+```
+
+```{r}
+static_line_chart(t=df_all, x='Month', y='5 Units or More', fill='MSA_Name', title='5 or More Units permits by month Nov 2019-June 2023')+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+ theme(legend.position = "bottom")
+```
+
+```{r}
+static_line_chart(t=df_all, x='Month', y='Num of Structures With 5 Units or More', title='Num of Structures With 5 Units or More by Month', fill='MSA_Name')+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+ theme(legend.position = "bottom")
+```
