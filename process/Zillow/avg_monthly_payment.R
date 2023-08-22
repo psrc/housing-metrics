@@ -1,7 +1,7 @@
 # TITLE: Average Mortgage Payment
 # GEOGRAPHIES: King, Snohomish, Pierce (limited by Zillow)
 # DATA SOURCE: FreddieMac, Zillow
-# DATE MODIFIED: 8.21.2023
+# DATE MODIFIED: 8.22.2023
 # AUTHOR: Eric Clute
 
 library(openxlsx)
@@ -30,9 +30,11 @@ mortgageins <- 0.00             # set to 0 for 20% downpayment
 maxdebttoincome <- 0.31         # same as JCHS   
 
 interest_url <- "https://www.freddiemac.com/pmms/docs/historicalweeklydata.xlsx"
-value_url <- "https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_market_tracker/redfin_metro_market_tracker.tsv000.gz"
 ZORI_url <- "https://files.zillowstatic.com/research/public_csvs/zori/Metro_zori_sm_sa_month.csv?t=1691785225"
 ZHVI_url <- "https://files.zillowstatic.com/research/public_csvs/zhvi/Metro_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv"
+
+# ZORI: Zillow Observed Rent Index - All Homes + Multifamily, Smoothed, Seasonally-Adjusted
+# ZHVI: Zillow Home Value Index - All Homes (SFR & Condo) Time series, Smoothed, Seasonally-Adjusted
 
 # ---------------- INTEREST RATE DATA ----------------
 # download interest rate data from FreddieMac site
@@ -57,8 +59,6 @@ int$month <- str_sub(int$int_date, 1, 7)
 int <- int[!duplicated(int$month), ] 
 
 # ---------------- ZILLOW DATA ----------------
-#  ZORI: Zillow Observed Rent Index - All Homes + Multifamily, Smoothed, Seasonally-Adjusted
-#  ZHVI: Zillow Home Value Index - All Homes (SFR & Condo) Time series, Smoothed, Seasonally-Adjusted
 ZORI_raw = read.csv(ZORI_url)
 ZHVI_raw = read.csv(ZHVI_url)
 
@@ -112,7 +112,7 @@ smalltbl <- smalltbl %>% arrange(ymd(smalltbl$date))
 reqincome_vs_int_plot <- ggplot(analysis)  + 
   geom_bar(aes(x=date, y=int_rate*20000),stat="identity", fill="skyblue2",colour="#ffffff")+
   geom_line(aes(x=date, y=reqincome),stat="identity",color="grey40", linewidth=1)+
-  labs(title= paste(metro_area, " - Mortgage for Median Home"),
+  labs(title= paste(metro_area, "MSA - Mortgage for Median Home"),
        x="Year",y="Minimum Income Required ($)") +
   scale_y_continuous(labels=function(x) format(x, big.mark = ",", scientific = FALSE),sec.axis=sec_axis(~.*0.00005,name="Interest Rate (%)")) +
   scale_x_date(breaks = scales::breaks_width("1 year"),minor_breaks = scales::breaks_width("1 year")) +
@@ -122,7 +122,7 @@ reqincome_vs_int_plot
 mortgage_vs_rent_plot <- ggplot(analysis)  + 
   geom_line(aes(x=date, y=payment),stat="identity",color="grey40", size=1)+
   geom_line(aes(x=date, y=zori_rent),stat="identity",color="skyblue2", size=1)+
-  labs(title= paste(metro_area, " - Mortgage vs Median Rent"),
+  labs(title= paste(metro_area, "MSA - Mortgage vs Median Rent"),
        x="Year",y="Monthly Payment ($)") +
   scale_y_continuous(labels=function(x) format(x, big.mark = ",", scientific = FALSE),expand = c(0, 0), limits = c(0, NA)) +
   scale_x_date(breaks = scales::breaks_width("1 year"),minor_breaks = scales::breaks_width("1 year")) +

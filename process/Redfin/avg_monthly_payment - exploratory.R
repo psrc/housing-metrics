@@ -1,8 +1,12 @@
-# TITLE: Average Mortgage Payment
+# TITLE: Average Mortgage Payment - Exploratory
 # GEOGRAPHIES: King and Snohomish Only (limited by Redfin)
 # DATA SOURCE: Redfin, FreddieMac, Zillow
 # DATE MODIFIED: 8.21.2023
 # AUTHOR: Eric Clute
+
+#------------- NOTE --------------
+# Use with caution! Here I compare home value data from Redfin (Seattle MD) to rent data from Zillor (Seattle MSA).
+# Not compatible geographies. Keeping this file for reference. 
 
 library(openxlsx)
 library(tidyr)
