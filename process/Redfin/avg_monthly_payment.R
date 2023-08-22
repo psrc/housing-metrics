@@ -10,6 +10,7 @@ library(tidyverse)
 library(stringr)
 library(dplyr)
 library(psrccensus)
+library(magrittr)
 
 # assumptions
 metro_area <- "Seattle, WA"
