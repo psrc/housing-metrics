@@ -158,28 +158,6 @@ acs_race_opp <- opportunity_acs_21_new %>%
 # 2b. only select the Low and Very Low indices
 acs_low_verylow <- subset(acs_race_opp, opp_index == "Low" | opp_index == "Very Low")
 
-# 2c. plot counts
-
-opp_index_column <- static_column_chart(t= acs_low_verylow,
-                                        x = "race_ethnicity", y = "count",
-                                        fill = "opp_index",
-                                        pos = "dodge",
-                                        moe = "count_moe",
-                                        title = "Opportunity Index",
-                                        color = "psrc_pairs") 
-
-opp_index_column # stacked with labels
-
-opp_index_column <- static_column_chart(t= acs_race_totals,
-                                        x = "race_ethnicity", y = "count",
-                                        fill = "race_ethnicity",
-                                        pos = "dodge",
-                                        moe = "count_moe",
-                                        title = "Opportunity Index",
-                                        color = "psrc_pairs") 
-
-opp_index_column # stacked with labels
-
 # 2c. combine the totals for the region and table 2b. so that you can calculate the MOE for each race/ethnicity
 ## NOTE: when pulling in new data, you will need to change the numbers to reflect new table 1. values ##
 acs_comb_low_verylow <- acs_low_verylow %>%
