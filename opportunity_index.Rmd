@@ -164,27 +164,9 @@ acs_comb_low_verylow <- acs_low_verylow %>%
   add_column(total_region_count_RE = rep(c(24915, 575205, 228599, 427696, 33750, 568423, 2552260), each = 2), 
              .after = 'count_moe')
 
-# 3. calculate share of race/ethnicity
-acs_comb_low_verylow$share <- acs_comb_low_verylow$count/acs_comb_low_verylow$total_region_count_RE
+# 3. calculate share_moe
 
-# 4. create a subset table that calculates: the total count of those in the Low/Very Low indices
-acs_race_opp_low <- acs_low_verylow %>%
-  group_by(opp_index)%>%
-  summarise(count_opp=sum(count))
-
-# 4b. insert values into new column
-## NOTE: when pulling in new data, you will need to change the numbers to reflect new table 3. values, alternating every other ##
-acs_comb_low_verylow <- acs_comb_low_verylow %>%
-  add_column(total_opp_index = rep(c(896873, 850560, 896873, 850560, 896873, 850560, 896873, 850560, 896873, 850560, 896873, 850560, 
-                                     896873, 850560)), 
-             .after = 'share')
-
-# 5. calculate share_moe
-acs_comb_low_verylow$share_moe <- acs_comb_low_verylow$count_moe/acs_comb_low_verylow$total_opp_index
-
-# 6. rearrange
-acs_comb_low_verylow <- acs_comb_low_verylow[c(1, 2, 3, 4, 6, 8, 5, 7)]%>%
-  mutate(opp_index = fct_relevel(opp_index, "Very Low", "Low"))
+acs_comb_low_verylow$share_moe <- acs_comb_low_verylow$count_moe/acs_comb_low_verylow$total_region_count_RE
   
 ```
 
