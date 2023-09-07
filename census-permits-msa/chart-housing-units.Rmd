@@ -22,7 +22,7 @@ permits_df<-read_excel('census_bps_monthly.xlsx')
 
 ```
 
-Filter to the Seattle MSA only? Also calculate 3-month rolling averages?
+Combine Seattle and Bremerton MSA. Also calculate 3-month rolling averages.
 
 ```{r}
 total_df<- permits_df%>%group_by(Month)%>%
