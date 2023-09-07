@@ -1,0 +1,59 @@
+---
+title: "housing unit chart trend"
+author: "suzanne"
+date: "2023-09-07"
+output: html_document
+---
+
+zoo is a library to calculate the rolling averages
+```{r}
+library(readxl)
+library(dplyr)
+library(zoo)
+library(ggplot2)
+```
+
+
+First run census_permits_data_pull.Rmd to create the excel file with a table. 
+
+Read in the excel table:
+```{r}
+permits_df<-read_excel('census_bps_monthly.xlsx')
+
+```
+
+Filter to the Seattle MSA only? Also calculate 3-month rolling averages?
+
+```{r}
+total_df<- permits_df%>%group_by(Month)%>%
+           summarise(sum_Total=sum(Total),
+                     sum_1Unit=sum(`1 Unit`))
+  
+
+total_df_3mth<-total_df%>%
+  mutate(multifamily=sum_Total-sum_1Unit)%>%
+  mutate(move_ave3_total=rollapply(sum_Total, 3, mean, align='center', fill=NA),
+         move_ave3_sf=rollapply(sum_1Unit, 3, mean, align='center', fill=NA),
+         move_ave3_mf=rollapply(multifamily, 3, mean, align='center', fill=NA))%>%
+  mutate(month_format=paste(substr(Month,1,4), substr(Month,5,6), sep='-'))
+```
+
+```{r}
+housing_plot<-ggplot(total_df_3mth) +
+  geom_bar(aes(x=month_format, y=move_ave3_total,fill='Total'), stat="identity")+
+  geom_line(aes(x=month_format, y=move_ave3_sf,group =1, color='Single family detached & attached'),stat="identity")+
+  geom_line(aes(x=month_format, y=move_ave3_mf, color="Multifamily 2+ units",group=2),stat="identity",)+
+    scale_color_manual(values=c("#F05A28","#91268F"))+
+  scale_fill_manual(values=c("#A9D46E"))+
+  theme(axis.title.x=element_blank(),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.title.y=element_blank(),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+       panel.background = element_blank(), axis.line = element_line(colour = "black"))+
+  theme(legend.position = "bottom",
+        legend.title = element_blank())+
+  labs(title="Permitted Housing Units, Central Puget Sound \n (3 month average)")
+
+housing_plot
+    
+```
