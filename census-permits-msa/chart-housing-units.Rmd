@@ -32,9 +32,9 @@ total_df<- permits_df%>%group_by(Month)%>%
 
 total_df_3mth<-total_df%>%
   mutate(multifamily=sum_Total-sum_1Unit)%>%
-  mutate(move_ave3_total=rollapply(sum_Total, 3, mean, align='center', fill=NA),
-         move_ave3_sf=rollapply(sum_1Unit, 3, mean, align='center', fill=NA),
-         move_ave3_mf=rollapply(multifamily, 3, mean, align='center', fill=NA))%>%
+  mutate(move_ave3_total=rollapply(sum_Total, 3, mean, align='right', fill=NA),
+         move_ave3_sf=rollapply(sum_1Unit, 3, mean, align='right', fill=NA),
+         move_ave3_mf=rollapply(multifamily, 3, mean, align='right', fill=NA))%>%
   mutate(month_format=paste(substr(Month,1,4), substr(Month,5,6), sep='-'))
 ```
 
