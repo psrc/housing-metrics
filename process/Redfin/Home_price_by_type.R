@@ -1,37 +1,46 @@
 # TITLE: Median Home Price by Type
 # GEOGRAPHIES: King and Snohomish Only (limited by Redfin)
 # DATA SOURCE: Redfin
-# DATE MODIFIED: 8.4.2023
+# DATE MODIFIED: 8.24.2023
 # AUTHOR: Eric Clute
 
 library(tidyverse)
+library(openxlsx)
+library(magrittr)
 
-redfin_raw <- read_tsv("https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_market_tracker/redfin_metro_market_tracker.tsv000.gz")
+value_url <- "https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_market_tracker/redfin_metro_market_tracker.tsv000.gz"
+save_path <- "J:/Projects/V2050/Housing/Monitoring/2023Update/Home Price by Type - Redfin/PriceByType-KingSnohomish - infogram.csv"
 
-# Seattle Metro area only includes King and Snohomish Counties. Tacoma = Pierce, and Bremerton = Kitsap
-redfin <- redfin_raw %>%
-  filter(region == "Seattle, WA metro area") %>%
+metro_area <- "Seattle, WA"
+earliestdate <- "2012-07-01"
+latestdate <- "2023-07-30"
+
+# Import Redfin data, limit to metro area and by date
+redfin_raw <- read_tsv(value_url)
+
+# Limited to Metro area selected above
+value <- redfin_raw %>%
+  filter(str_detect(region, metro_area)) %>%
   transmute(
     date = period_begin,
     region = region,
     property_type = property_type,
-    median_sale_price = median_sale_price
-    )
+    median_sale_price = median_sale_price)
 
-# Remove Multi-Family rows
-redfin <- redfin %>%
+# limit to all residential properties, restrict to date range selected above
+value <- value %>%
   filter(!(property_type == "Multi-Family (2-4 Unit)"))
+value <- with(value, value[(date >= earliestdate & date <= latestdate), ])
+value$month <- str_sub(value$date, 1, 7)
 
-# Sort by date and property type/pivot wide before exporting
-redfin <- redfin[order(as.Date(redfin$date),(factor(redfin$property_type, levels = c("All Residential", "Single Family Residential", "Townhouse", "Condo/Co-op")))),]
+# Sort by date and property type/pivot
+value <- value[order(as.Date(value$date),(factor(value$property_type, levels = c("Condo/Co-op","Single Family Residential","Townhouse","All Residential")))),]
 
-redfin <- redfin %>%
-  pivot_wider(names_from = date , values_from = median_sale_price)
+value <- value %>%
+  pivot_wider(names_from = property_type, values_from = median_sale_price)
 
-# Exporting just Seattle Metro Data (King and Snohomish)
-library(openxlsx)
+# Filter to month of latest date
+value <- subset(value, str_sub(value$month, -2,-1) == str_sub(latestdate, -5,-4))
 
-work_book <- createWorkbook()
-addWorksheet(work_book, sheetName = "King & Snohomish")
-writeData(work_book, "King & Snohomish", redfin)
-saveWorkbook(work_book, file = "Home Price by Type - Redfin/PriceByType-KingSnohomish.xlsx", overwrite = TRUE)
+# Export
+write.csv(value,file = save_path)
