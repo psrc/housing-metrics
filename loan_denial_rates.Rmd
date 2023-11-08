@@ -36,7 +36,7 @@ install_psrc_fonts()
 
 ```{r, set location}
 #setwd('J:/Projects/V2050/Housing/Monitoring/2023Update')
-network_file_loc<-'J:/Projects/V2050/Housing/Monitoring/2023Update/Loan Denials- FFIEC'
+network_file_loc<-'J:/Projects/V2050/Housing/Monitoring/2023Update/Metrics/Loan Denials- FFIEC'
 ```
 
 ### Christy automation --- code review
