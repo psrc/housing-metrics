@@ -129,15 +129,36 @@ race_22_bar
 ```
 
 ```{r, chart 2 - Time Series Loan Denial Rates by Race and Ethnicity (2018-2022)}
-
-region_POC <- region_clean %>% 
+region_POC <- region_clean[region_clean$race_ethnicity %in% c("American Indian or Alaska Native", "Asian",
+                                                              "Black or African American", "Hispanic or Latino",
+                                                              "Native Hawaiian or Other Pacific Islander",
+                                                              "2 or more minority races", "White"), ] %>%
+  mutate(race_ethnicity= case_when(race_ethnicity == "Black or African American" ~ "Black",
+                                   race_ethnicity == "2 or more minority races" ~ "Two or more non-white races",
+                                   TRUE ~ as.character(race_ethnicity))) %>%
+  mutate(race_ethnicity = fct_relevel(race_ethnicity, 
+                                      "American Indian or Alaska Native", "Asian",
+                                      "Black", "Hispanic or Latino",
+                                      "Native Hawaiian or Other Pacific Islander",
+                                      "Two or more non-white races", "White")) %>%
   mutate(POC_category = case_when(race_ethnicity == "White" ~"Non-POC",
                          race_ethnicity == "Asian" ~"Asian POC",
          TRUE ~ "Non-Asian POC")) %>%
-  group_by(data_year, POC_category)%>%
-  summarise(received=sum(received),
-            denied=(sum(denied)))%>%
+  group_by(data_year, POC_category) %>%
+  summarise(received = sum(received),
+            denied = (sum(denied))) %>%
   mutate(share_denials_race = denied/received)
+  
+
+# Megan's original code
+# region_POC <- region_clean %>% 
+#   mutate(POC_category = case_when(race_ethnicity == "White" ~"Non-POC",
+#                          race_ethnicity == "Asian" ~"Asian POC",
+#          TRUE ~ "Non-Asian POC")) %>%
+#   group_by(data_year, POC_category)%>%
+#   summarise(received=sum(received),
+#             denied=(sum(denied)))%>%
+#   mutate(share_denials_race = denied/received)
 
 region_POC$data_year <- as.factor(region_POC$data_year)
 
