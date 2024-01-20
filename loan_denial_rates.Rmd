@@ -2,7 +2,9 @@
 title: "loan_denial_rates"
 author: "Meg Grzybowski"
 date: "2023-07-24"
-output: pdf_document
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
@@ -129,22 +131,14 @@ race_22_bar
 ```
 
 ```{r, chart 2 - Time Series Loan Denial Rates by Race and Ethnicity (2018-2022)}
-region_POC <- region_clean[region_clean$race_ethnicity %in% c("American Indian or Alaska Native", "Asian",
-                                                              "Black or African American", "Hispanic or Latino",
-                                                              "Native Hawaiian or Other Pacific Islander",
-                                                              "2 or more minority races", "White"), ] %>%
-  mutate(race_ethnicity= case_when(race_ethnicity == "Black or African American" ~ "Black",
-                                   race_ethnicity == "2 or more minority races" ~ "Two or more non-white races",
-                                   TRUE ~ as.character(race_ethnicity))) %>%
+region_POC <- region_clean[region_clean$race_ethnicity %in% c("Asian",
+                                                              "Black or African American",
+                                                              "Hispanic or Latino",
+                                                              "White"), ] %>%
   mutate(race_ethnicity = fct_relevel(race_ethnicity, 
-                                      "American Indian or Alaska Native", "Asian",
-                                      "Black", "Hispanic or Latino",
-                                      "Native Hawaiian or Other Pacific Islander",
-                                      "Two or more non-white races", "White")) %>%
-  mutate(POC_category = case_when(race_ethnicity == "White" ~"Non-POC",
-                         race_ethnicity == "Asian" ~"Asian POC",
-         TRUE ~ "Non-Asian POC")) %>%
-  group_by(data_year, POC_category) %>%
+                                      "Asian",
+                                      "Black or African American", "Hispanic or Latino", "White")) %>%
+  group_by(data_year, race_ethnicity) %>%
   summarise(received = sum(received),
             denied = (sum(denied))) %>%
   mutate(share_denials_race = denied/received)
@@ -166,31 +160,31 @@ region_POC$data_year <- as.factor(region_POC$data_year)
 
 denial_race_static_line <- static_line_chart(t= region_POC,
                                             x = "data_year", y = "share_denials_race",
-                                            fill = "POC_category",
+                                            fill = "race_ethnicity",
                                             est = "percent",
                                             breaks = NULL,
                                             lwidth = 1,
-                                            color = "psrc_pairs",
+                                            color = "psrc_light",
                                             title = "Loan Denial Rates by Race and Ethnicity (2018-2022)",
                                             subtitle = "Federal Financial Institutions Examination Council (FFIEC), HMDA Database") +
-  scale_y_continuous(limits = c(0.00, 0.20),
+  scale_y_continuous(limits = c(0.00, 0.25),
                        labels = scales::percent)
 
 
 denial_race_static_line
 
-denial_race_interactive_line <- interactive_line_chart(t= region_POC,
-                                            x = "data_year", y = "share_denials_race",
-                                            fill = "POC_category",
-                                            est = "percent",
-                                            dec = 1,
-                                            breaks = NULL,
-                                            lwidth = 1,
-                                            color = "psrc_pairs",
-                                            title = "Loan Denial Rates by Race and Ethnicity (2018-2022)",
-                                            subtitle = "Federal Financial Institutions Examination Council (FFIEC),  HMDA Database")
-
-denial_race_interactive_line
+#denial_race_interactive_line <- interactive_line_chart(t= region_POC,
+#                                            x = "data_year", y = "share_denials_race",
+#                                            fill = "race_ethnicity",
+#                                            est = "percent",
+#                                            dec = 1,
+#                                            breaks = NULL,
+#                                            lwidth = 1,
+#                                            color = "psrc_light",
+#                                           title = "Loan Denial Rates by Race and Ethnicity (2018-2022)",
+#                                            subtitle = "Federal Financial Institutions Examination Council (FFIEC),  HMDA Database")
+#
+#denial_race_interactive_line
 
 ```
 
