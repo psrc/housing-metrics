@@ -1,7 +1,7 @@
 ---
 title: "loan_denial_rates"
-author: "Meg Grzybowski"
-date: "2023-07-24"
+author: "Eric Clute & Meg Grzybowski"
+date: "2024-01-25"
 output:
   html_document:
     df_print: paged
@@ -15,7 +15,6 @@ library(httr)
 library(jsonlite)
 library(tidyverse) #includes dplyr and ggplot2
 
-#devtools::install_github("psrc/psrc.travelsurvey", force = TRUE)
 #devtools::install_github("psrc/psrccensus", force = TRUE)
 #devtools::install_github("psrc/psrcplot", force = TRUE)
 #devtools::install_github("psrc/psrctrends", force = TRUE)
@@ -131,34 +130,17 @@ race_22_bar
 ```
 
 ```{r, chart 2 - Time Series Loan Denial Rates by Race and Ethnicity (2018-2022)}
-region_POC <- region_clean[region_clean$race_ethnicity %in% c("Asian",
-                                                              "Black or African American",
-                                                              "Hispanic or Latino",
-                                                              "White"), ] %>%
-  mutate(race_ethnicity = fct_relevel(race_ethnicity, 
-                                      "Asian",
-                                      "Black or African American", "Hispanic or Latino", "White")) %>%
+region_timeseries <- region_clean[region_clean$race_ethnicity %in% c("Asian", "Black or African American", "Hispanic or Latino", "White"), ] %>%
+  mutate(race_ethnicity = fct_relevel(race_ethnicity, "Asian", "Black or African American", "Hispanic or Latino", "White")) %>%
   group_by(data_year, race_ethnicity) %>%
   summarise(received = sum(received),
             denied = (sum(denied))) %>%
   mutate(share_denials_race = denied/received)
-  
 
-# Megan's original code
-# region_POC <- region_clean %>% 
-#   mutate(POC_category = case_when(race_ethnicity == "White" ~"Non-POC",
-#                          race_ethnicity == "Asian" ~"Asian POC",
-#          TRUE ~ "Non-Asian POC")) %>%
-#   group_by(data_year, POC_category)%>%
-#   summarise(received=sum(received),
-#             denied=(sum(denied)))%>%
-#   mutate(share_denials_race = denied/received)
-
-region_POC$data_year <- as.factor(region_POC$data_year)
+region_timeseries$data_year <- as.factor(region_timeseries$data_year)
 
 # time series line chart
-
-denial_race_static_line <- static_line_chart(t= region_POC,
+denial_race_static_line <- static_line_chart(t= region_timeseries,
                                             x = "data_year", y = "share_denials_race",
                                             fill = "race_ethnicity",
                                             est = "percent",
@@ -173,25 +155,11 @@ denial_race_static_line <- static_line_chart(t= region_POC,
 
 denial_race_static_line
 
-#denial_race_interactive_line <- interactive_line_chart(t= region_POC,
-#                                            x = "data_year", y = "share_denials_race",
-#                                            fill = "race_ethnicity",
-#                                            est = "percent",
-#                                            dec = 1,
-#                                            breaks = NULL,
-#                                            lwidth = 1,
-#                                            color = "psrc_light",
-#                                           title = "Loan Denial Rates by Race and Ethnicity (2018-2022)",
-#                                            subtitle = "Federal Financial Institutions Examination Council (FFIEC),  HMDA Database")
-#
-#denial_race_interactive_line
-
 ```
 
 ```{r, chart 3 - Loan Denial Rates by Income and Race/Ethnicity (2022)}
 
-region_22_income_race <- region_clean[region_clean$race_ethnicity %in% c("White", "Asian","Black or African American",
-                                                             "Hispanic or Latino"), ] %>%
+region_22_income_race <- region_clean[region_clean$race_ethnicity %in% c("White", "Asian","Black or African American", "Hispanic or Latino"), ] %>%
   mutate(median_income = fct_relevel(median_income, 
                                      "less than 50%", "50-79%", "80-99%", "100-119%", "120% or more")) %>%
   filter(data_year == "2022") %>%
