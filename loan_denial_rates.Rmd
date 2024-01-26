@@ -46,6 +46,7 @@ network_file_loc<-'J:/Projects/V2050/Housing/Monitoring/2023Update/Metrics/Loan 
 
 years <- 2018:2022
 
+# data collected here: https://ffiec.cfpb.gov/data-publication/aggregate-reports/
 # element names will be used for the region column and naming elements in master list. Adjust here.
 geogs <- list(bsp = "MSAMD14740_BremertonSilverdalePortOrchard",
               sb = "MSAMD42644_SeattleBellevueKent", 
