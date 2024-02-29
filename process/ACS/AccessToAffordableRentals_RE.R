@@ -1,7 +1,7 @@
 # TITLE: Affordable Rental Housing by Tract - for each R/E Category
 # GEOGRAPHIES: PSRC Region & Census Tract
 # DATA SOURCE: 5YR ACS Data
-# LAST EDITED: 6.2.2023
+# LAST EDITED: 2.29.2024
 # AUTHOR: Eric Clute
 
 library(psrccensus)
@@ -14,6 +14,9 @@ library(stringr)
 year <- (2010)
 inflation_year <- (2021)
 file_path <- "J:/Projects/V2050/Housing/Monitoring/2023Update/Access to Affordable Rental Housing/r_output 2010 5YR Adjusted.csv"
+
+# Key used to access St. Louis Federal Reserve (FRED) API key - inflation data
+fredr_set_key("99e2d81f189630d83b9e37ba8ca4f142")
 
 #------------ Collect Median Gross Rent by Tract ------------
 DP04Table_raw <- get_acs_recs(geography = 'tract',
