@@ -11,7 +11,7 @@ library(stringr)
 library(openxlsx)
 
 # Pull in data downloaded from tableau dashboard (make sure all 4 counties are visible before exporting to CSV)
-county_raw <- read.csv("J:/Projects/V2050/Housing/Monitoring/2023Update/Affordability Measures/med_sale_price_data_feb2023.csv")
+county_raw <- read.csv("J:/Projects/V2050/Housing/Monitoring/2023Update/Metrics/Affordability Measures/med_sale_price_data_feb2023.csv")
 
 # Filter - select only Feb records
 county <- county_raw  %>%
