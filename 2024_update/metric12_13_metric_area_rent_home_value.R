@@ -39,4 +39,4 @@ all_data %<>%
 colnames(all_data)<-gsub("X","",colnames(all_data))
 
 # Export
-write.csv(all_data, file = file.path(export_path, "metric12_13_raw.csv"), row.names = FALSE)
+#write.csv(all_data, file = file.path(export_path, "metric12_13_raw.csv"), row.names = FALSE)
