@@ -36,8 +36,8 @@ ZORI_url <- "https://files.zillowstatic.com/research/public_csvs/zori/Metro_zori
 # ZORI: Zillow Observed Rent Index - All Homes + Multifamily, Smoothed, Seasonally-Adjusted
 # ZHVI: Zillow Home Value Index - All Homes (SFR & Condo) Time series, Smoothed, Seasonally-Adjusted
 
-# ---------------- INTEREST RATE DATA ----------------
-# download interest rate data from FreddieMac site
+# ---------------- Mortgage Rate DATA ----------------
+# download Mortgage Rate data from FreddieMac site
 int_raw = read.xlsx(interest_url, sheet=1)
 
 # clean up table
@@ -114,7 +114,7 @@ reqincome_vs_int_plot <- ggplot(analysis)  +
   geom_line(aes(x=date, y=reqincome),stat="identity",color="grey40", linewidth=1)+
   labs(title= paste(metro_area, "MSA - Mortgage for Median Home"),
        x="Year",y="Minimum Income Required ($)") +
-  scale_y_continuous(labels=function(x) format(x, big.mark = ",", scientific = FALSE),sec.axis=sec_axis(~.*0.00005,name="Interest Rate (%)")) +
+  scale_y_continuous(labels=function(x) format(x, big.mark = ",", scientific = FALSE),sec.axis=sec_axis(~.*0.00005,name="Mortgage Rate (%)")) +
   scale_x_date(breaks = scales::breaks_width("1 year"),minor_breaks = scales::breaks_width("1 year")) +
   theme(text = element_text(size = 20)) 
 reqincome_vs_int_plot
@@ -134,7 +134,7 @@ mortgage_vs_rent_plot
 #   geom_line(aes(x=date, y=int_rate*1000),stat="identity",color="grey40", size=1)+
 #   labs(title= paste(metro_area, " - Mortgage for Median Home"),
 #        x="Year",y="Monthly Mortgage") +
-#   scale_y_continuous(labels=function(x) format(x, big.mark = ",", scientific = FALSE),sec.axis=sec_axis(~.*0.001,name="Interest Rate (%)")) +
+#   scale_y_continuous(labels=function(x) format(x, big.mark = ",", scientific = FALSE),sec.axis=sec_axis(~.*0.001,name="Mortgage Rate (%)")) +
 #   scale_x_date(breaks = scales::breaks_width("2 year")) +
 #   theme(text = element_text(size = 20)) 
 # pymt_int_plot
