@@ -1,7 +1,7 @@
 # TITLE: Renter Cost Burden by Race
 # GEOGRAPHIES: PSRC Region
 # DATA SOURCE: ACS PUMS 5YR
-# DATE MODIFIED: 5.22.2023
+# DATE MODIFIED: 4.1.2024
 # AUTHOR: Eric Clute
 
 # Reviewer: Hana Sevcikova, 5/31/2023
@@ -48,11 +48,12 @@ library(openxlsx)
 
 # working directory
 setwd("J:/Projects/V2050/Housing/Monitoring/2024Update/Data")
-#setwd("~/psrc/housing-metrics/process/PUMS")
 
 # years to include
 years <- c(2010, 2016, 2022)
 inflation_year <- 2022
+final_year_for_re_smalltbl <- 2022
+years_for_inc_smalltbl <- c(2010, 2022)
 
 # access FRED inflation data
 fredr_set_key("99e2d81f189630d83b9e37ba8ca4f142")
@@ -89,7 +90,7 @@ create_rent_burden_column <- function(GRPIP){
                   "No rent paid"))
 }
 
-# ----------------------------- SUMMARIZE BY RACE/ETHNICITY -----------------------------
+# SUMMARIZE BY RACE/ETHNICITY -----------------------------
 
 rcb_re_func <- function(rcb){
   # Filter to only renters, create income/rent burden groupings, rename race/ethnicity categories, combine Some other Race & Two or More Races
@@ -106,7 +107,7 @@ rcb_re_func <- function(rcb){
   summarize_and_clean(rcb, c("PRACE","rent_burden"))
 }
 
-# ----------------------------- SUMMARIZE BY INCOME CATEGORY -----------------------------
+# SUMMARIZE BY INCOME CATEGORY -----------------------------
 rcb_inc_func <- function(rcb){
   
   # Adjust for inflation
@@ -191,13 +192,22 @@ rcb_inc_cb <- static_line_chart(rcb_inc_all_chart, "DATA_YEAR", "share_Between 3
                                    title="Change in Cost Burden by Income (30-50% of income)",color="pgnobgy_10")
 print(rcb_inc_cb)
 
+# create small tables for export -----------
+rcb_re_smalltbl <- rcb_re_all %>%
+  filter(DATA_YEAR == final_year_for_re_smalltbl) %>%
+  select(DATA_YEAR, PRACE, `share_Greater than 50 percent`, `share_Between 30 and 50 percent`)
+
+rcb_inc_smalltbl <- rcb_inc_all %>%
+  filter(DATA_YEAR %in% years_for_inc_smalltbl) %>%
+  pivot_wider(id_cols = income_bin, names_from = DATA_YEAR , values_from = c(`share_Between 30 and 50 percent`,`share_Greater than 50 percent`))
+
 # Exporting tables------------
 
 if(export_tables){
   work_book <- createWorkbook()
-  addWorksheet(work_book, sheetName = "rcb_re_all")
-  writeData(work_book, "rcb_re_all", rcb_re_all)
-  addWorksheet(work_book, sheetName = "rcb_inc_all")
-  writeData(work_book, "rcb_inc_all", rcb_inc_all)
+  addWorksheet(work_book, sheetName = "rcb_re")
+  writeData(work_book, "rcb_re", rcb_re_smalltbl)
+  addWorksheet(work_book, sheetName = "rcb_inc")
+  writeData(work_book, "rcb_inc", rcb_inc_smalltbl)
   saveWorkbook(work_book, file = output_table_name, overwrite = TRUE)
 }
