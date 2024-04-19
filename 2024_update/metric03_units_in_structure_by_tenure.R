@@ -1,20 +1,69 @@
 # TITLE: Units in Structure by Tenure
 # GEOGRAPHIES: PSRC Region & County
 # DATA SOURCE: 5YR ACS Data
-# LAST EDITED: 3.29.2024
+# LAST EDITED: 4.18.2024
 # AUTHOR: Eric Clute & Christy Lam
 
 library(psrccensus)
 library(openxlsx)
 library(tidycensus)
 library(tidyverse)
+library(psrcplot)
+library(ggplot2)
 
-# assumptions
+# Assumptions
 setwd("J:/Projects/V2050/Housing/Monitoring/2024Update/data/metric03_units_in_structure_by_tenure")
-years <- c(2010,2022)
+years <- c(2010,2022) # base year and final year
+compared_years <- c(2010,2016,2022) # comparison years over time
 
-#---------------------OWNER OCCUPIED UNITS----------------------
+# FUNCTIONS
 
+# Formatting, calculating change in share
+calc_share_growth <- function(table) {
+  
+  # calculate totals in new dataframe
+  totals <- table %>% 
+    filter(!(building_size %in% c('2-9 units', '2-19 units','10-19 units'))) %>%
+    group_by(name, year) %>% 
+    summarise(total = sum(estimate))
+  
+  # join to main table
+  table <- table %>% 
+    left_join(totals, by = c('name', 'year'))
+  
+  # calculate % of units by building size and % growth between years
+  table <- table %>% 
+    mutate(share = estimate/total) %>% 
+    arrange(name, building_size) %>% 
+    group_by(name, building_size) %>% 
+    mutate(growth = estimate-lag(estimate)) %>% 
+    mutate(total_diff = total - lag(total)) %>% 
+    mutate(growth_share = growth/total_diff) %>% 
+    arrange(factor(name, levels = c('King County', 'Kitsap County', 'Pierce County', 'Snohomish County', 'Region')))
+}
+pivot_to_wide <- function(table) {
+  
+  # wide format
+  growth_cols_head <- c(paste0('growth_', years[1:(length(years)-1)]), paste0('growth_share_', years[1:(length(years)-1)]))
+  growth_cols_tail <- rep(str_sub(years[-1], start = 3, end = 4), 2)
+  
+  new_colnames <- map2(growth_cols_head, growth_cols_tail, ~paste0(.x, '-', .y)) %>% unlist()
+  old_colnames <- c(paste0('growth_', years[-1]), paste0('growth_share_', years[-1]))
+  names(old_colnames) <- new_colnames
+  
+  # pivot to wide format
+  df <- table %>% 
+    pivot_wider(id_cols = c('name', 'building_size'),
+                names_from = year,
+                values_from = c('estimate', 'moe', 'total', 'share', 'growth', 'growth_share')) 
+  
+  # rename growth columns
+  df <- df %>% 
+    rename(all_of(old_colnames)) %>% 
+    select(-ends_with(paste0('growth_', years[1])), -ends_with(paste0('growth_share_', years[1])))
+}
+
+# Owner Occupied
 create_uis_owner_summary_table <- function(year) {
   
   #---------------------Grab data from Census API------------------------
@@ -82,25 +131,40 @@ create_uis_owner_summary_table <- function(year) {
   return(df)
   
 }
+create_uis_owner_compare <- function(compared_year) {
+  
+  # Grab data from Census API
+  uis_raw<-get_acs_recs(geography = 'county',
+                        table.names = c('B25032'),
+                        years = compared_year,
+                        counties = c("King", "Kitsap", "Pierce", "Snohomish"),
+                        acs.type = 'acs5')
+  
+  # Create custom groupings
+  # The next step is to create the appropriate grouping variable (using pipes for simplicity)
+  
+  uis_coded <- uis_raw %>% 
+    mutate(building_size=factor(case_when(grepl("_003$", variable) ~ "Single Family",
+                                          grepl("_004$|_005$|_006$|_007$", variable) ~ "2-9 units",
+                                          grepl("_008$", variable) ~ "10-19 units",
+                                          grepl("_009$|_010$", variable) ~ "20+ units",
+                                          grepl("_011$|_012$", variable) ~ "Mobile Home/Other",
+                                          TRUE ~ NA_character_),
+                                levels=c("Single Family","2-9 units","10-19 units", "20+ units", "Mobile Home/Other")))
+  
+  # Aggregate data
+  # In this step, you create an aggregate, using the grouping you created in the last call.
+  uis_agg_owner <- summarize(uis_raw, estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE)) 
+  
+  
+  # In this step, you create an aggregate, using the first grouping you created in the last call.
+  uis_agg_owner_01 <- uis_coded %>% 
+    group_by(across(c(name, year, building_size))) %>% 
+    summarize(estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE))
+  
+}
 
-#---------------------Summarize data into one table, sort by building size------------------------
-
-# iterate thru each year in the function, stored a list. Combine lists and order output by building size category
-
-all_owner_tables <- map(years, ~create_uis_owner_summary_table(.x)) %>%
-  reduce(bind_rows)
-
-uis_owner <- all_owner_tables %>% 
-  mutate(building_size = factor(building_size,
-                                levels = c('Single Family', '2-4 units', '2-9 units', '5-19 units', '2-19 units', "10-19 units", '20+ units', 'Mobile Home/Other'))) %>% 
-  arrange(year, name, building_size) %>% 
-  filter(building_size != is.na(building_size))
-
-rm(list = setdiff(ls(), c("uis_owner", "create_uis_owner_summary_table", "years")))
-
-
-#---------------------RENTER OCCUPIED UNITS------------------------
-
+# Renter Occupied
 create_uis_renter_summary_table <- function(year) {
   
   #---------------------Grab data from Census API------------------------
@@ -112,7 +176,6 @@ create_uis_renter_summary_table <- function(year) {
                         acs.type = 'acs5')
   
   #---------------------Create custom groupings------------------------
-  
   # The next step is to create the appropriate grouping variable (using pipes for simplicity)
   
   uis_coded <- uis_raw %>% 
@@ -136,9 +199,8 @@ create_uis_renter_summary_table <- function(year) {
                                             grepl("_022$|_023$", variable) ~ "Mobile Home/Other",
                                             TRUE ~ NA_character_),
                                   levels=c("Single Family","2-9 units","10-19 units", "20+ units", "Mobile Home/Other")))
-
-  #--------------------Aggregate data, incorporate 2-19 Unit group------------------------
   
+  #--------------------Aggregate data, incorporate 2-19 Unit group------------------------
   # In this step, you create an aggregate, using the grouping you created in the last call.
   uis_agg_renter <- summarize(uis_raw, estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE)) 
   
@@ -166,11 +228,85 @@ create_uis_renter_summary_table <- function(year) {
     bind_rows(list(uis_agg_renter_02,uis_agg_renter_03))
   
 }
+create_uis_renter_compare <- function(compared_year) {
+  
+  # Grab data from Census API
+  uis_raw<-get_acs_recs(geography = 'county',
+                        table.names = c('B25032'),
+                        years = compared_year,
+                        counties = c("King", "Kitsap", "Pierce", "Snohomish"),
+                        acs.type = 'acs5')
+  
+  # Create custom groupings
+  # The next step is to create the appropriate grouping variable (using pipes for simplicity)
+  
+  uis_coded <- uis_raw %>% 
+    mutate(building_size=factor(case_when(grepl("_014$", variable) ~ "Single Family",
+                                          grepl("_015$|_016$|_017$|_018$", variable) ~ "2-9 units",
+                                          grepl("_019$", variable) ~ "10-19 units",
+                                          grepl("_020$|_021$", variable) ~ "20+ units",
+                                          grepl("_022$|_023$", variable) ~ "Mobile Home/Other",
+                                          TRUE ~ NA_character_),
+                                levels=c("Single Family","2-9 units","10-19 units", "20+ units", "Mobile Home/Other")))
+  
+  # Aggregate data
+  # In this step, you create an aggregate, using the grouping you created in the last call.
+  uis_agg_renter <- summarize(uis_raw, estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE)) 
+  
+  
+  # In this step, you create an aggregate, using the first grouping you created in the last call.
+  uis_agg_renter_01 <- uis_coded %>% 
+    group_by(across(c(name, year, building_size))) %>% 
+    summarize(estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE))
+  
+}
 
-#---------------------Summarize data into one table, sort by building size------------------------
+# Compare Over Time
+create_uis_compare <- function(compared_year) {
+  
+  # Grab data from Census API
+  uis_raw<-get_acs_recs(geography = 'county',
+                        table.names = c('B25032'),
+                        years = compared_year,
+                        counties = c("King", "Kitsap", "Pierce", "Snohomish"),
+                        acs.type = 'acs5')
+  
+  # Create custom groupings
+  # The next step is to create the appropriate grouping variable (using pipes for simplicity)
+  
+  uis_coded <- uis_raw %>% 
+    mutate(building_size=factor(case_when(grepl("_003$|_014$", variable) ~ "Single Family",
+                                          grepl("_004$|_005$|_006$|_007$|_015$|_016$|_017$|_018$", variable) ~ "2-9 units",
+                                          grepl("_008$|_019$", variable) ~ "10-19 units",
+                                          grepl("_009$|_010$|_020$|_021$", variable) ~ "20+ units",
+                                          grepl("_011$|_012$|_022$|_023$", variable) ~ "Mobile Home/Other",
+                                          TRUE ~ NA_character_),
+                                levels=c("Single Family","2-9 units","10-19 units", "20+ units", "Mobile Home/Other")))
+  
+  # Aggregate data
+  # In this step, you create an aggregate, using the grouping you created in the last call.
+  uis_agg <- summarize(uis_raw, estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE)) 
+  
+  
+  # In this step, you create an aggregate, using the first grouping you created in the last call.
+  uis_agg_01 <- uis_coded %>% 
+    group_by(across(c(name, year, building_size))) %>% 
+    summarize(estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE))
+  
+}
 
-# iterate thru each year in the function, stored a list. Combine lists and order output by building size category
+# ANALYSES 
+# Owners UIS table ------------------------
+all_owner_tables <- map(years, ~create_uis_owner_summary_table(.x)) %>%
+  reduce(bind_rows)
 
+uis_owner <- all_owner_tables %>% 
+  mutate(building_size = factor(building_size,
+                                levels = c('Single Family', '2-4 units', '2-9 units', '5-19 units', '2-19 units', "10-19 units", '20+ units', 'Mobile Home/Other'))) %>% 
+  arrange(year, name, building_size) %>% 
+  filter(building_size != is.na(building_size))
+
+# Renters UIS table ------------------------
 all_renter_tables <- map(years, ~create_uis_renter_summary_table(.x)) %>% 
   reduce(bind_rows)
 
@@ -180,56 +316,7 @@ uis_renter <- all_renter_tables %>%
   arrange(year, name, building_size) %>% 
   filter(building_size != is.na(building_size))
 
-rm(list = setdiff(ls(), c("uis_renter", "create_uis_renter_summary_table", "uis_owner", "create_uis_owner_summary_table", "years")))
-
-#------------------------Summarize existing housing stock------------------------
-
-
-calc_share_growth <- function(table) {
-  
-  # calculate totals in new dataframe
-  totals <- table %>% 
-    filter(!(building_size %in% c('2-9 units', '2-19 units','10-19 units'))) %>%
-    group_by(name, year) %>% 
-    summarise(total = sum(estimate))
-  
-  # join to main table
-  table <- table %>% 
-    left_join(totals, by = c('name', 'year'))
-  
-  # calculate % of units by building size and % growth between years
-  table <- table %>% 
-    mutate(share = estimate/total) %>% 
-    arrange(name, building_size) %>% 
-    group_by(name, building_size) %>% 
-    mutate(growth = estimate-lag(estimate)) %>% 
-    mutate(total_diff = total - lag(total)) %>% 
-    mutate(growth_share = growth/total_diff) %>% 
-    arrange(factor(name, levels = c('King County', 'Kitsap County', 'Pierce County', 'Snohomish County', 'Region')))
-}
-
-pivot_to_wide <- function(table) {
-  
-  # wide format
-  growth_cols_head <- c(paste0('growth_', years[1:(length(years)-1)]), paste0('growth_share_', years[1:(length(years)-1)]))
-  growth_cols_tail <- rep(str_sub(years[-1], start = 3, end = 4), 2)
-  
-  new_colnames <- map2(growth_cols_head, growth_cols_tail, ~paste0(.x, '-', .y)) %>% unlist()
-  old_colnames <- c(paste0('growth_', years[-1]), paste0('growth_share_', years[-1]))
-  names(old_colnames) <- new_colnames
-  
-  # pivot to wide format
-  df <- table %>% 
-    pivot_wider(id_cols = c('name', 'building_size'),
-                names_from = year,
-                values_from = c('estimate', 'moe', 'total', 'share', 'growth', 'growth_share')) 
-  
-  # rename growth columns
-  df <- df %>% 
-    rename(all_of(old_colnames)) %>% 
-    select(-ends_with(paste0('growth_', years[1])), -ends_with(paste0('growth_share_', years[1])))
-}
-
+# Summarize existing housing stock------------------------
 # long format
 df_uis_owner <- calc_share_growth(uis_owner)
 df_uis_renter <- calc_share_growth(uis_renter)
@@ -270,65 +357,20 @@ df_uis_renter_wide <- df_uis_renter_wide %>%
                                         rr_score_2022 > 50 ~"unreliable",
                                         !is.na(rr_score_2022) ~ NA)))
 
-# Calculate Z score - significant difference between vintages (compare 2010 to 2022)
+# Format small table to be exported to Infogram ------------------------
 
+df_uis_owner_smalltbl <- pivot_wider(df_uis_owner_wide,id_cols = name, names_from = building_size, values_from = `growth_2010-22`)
+df_uis_owner_smalltbl <- df_uis_owner_smalltbl %>% 
+  select(name, `Single Family`, `2-19 units`, `20+ units`, `Mobile Home/Other`)
 
+df_uis_renter_smalltbl <- pivot_wider(df_uis_renter_wide,id_cols = name, names_from = building_size, values_from = `growth_2010-22`)
+df_uis_renter_smalltbl <- df_uis_renter_smalltbl %>% 
+  select(name, `Single Family`, `2-19 units`, `20+ units`, `Mobile Home/Other`)
 
-#------------------------Export tables for Excel------------------------
-work_book <- createWorkbook()
-addWorksheet(work_book, sheetName = "Owners 5YR ACS")
-addWorksheet(work_book, sheetName = "Renters 5YR ACS")
-writeData(work_book, "Owners 5YR ACS", df_uis_owner_wide)
-writeData(work_book, "Renters 5YR ACS", df_uis_renter_wide)
+# CHARTS - COMPARISONS OVER TIME
 
-# Create a percent style
-pct = createStyle(numFmt="PERCENTAGE")
-
-# Add the percent style to the desired cells
-addStyle(work_book, "Owners 5YR ACS", style=pct, cols=share_cols_owner, rows=2:(nrow(df_uis_owner_wide)+1), gridExpand=TRUE)
-addStyle(work_book, "Renters 5YR ACS", style=pct, cols=share_cols_renter, rows=2:(nrow(df_uis_renter_wide)+1), gridExpand=TRUE)
-saveWorkbook(work_book, file = "metric03_raw.xlsx", overwrite = TRUE)
-
-#------------------------COMPARISONS OVER TIME------------------------
-compared_years <- c(2010,2016,2022)
-
-# All Occupied Units----------------------
-create_uis_compare <- function(compared_year) {
-  
-  # Grab data from Census API
-  uis_raw<-get_acs_recs(geography = 'county',
-                        table.names = c('B25032'),
-                        years = compared_year,
-                        counties = c("King", "Kitsap", "Pierce", "Snohomish"),
-                        acs.type = 'acs5')
-  
-  # Create custom groupings
-  # The next step is to create the appropriate grouping variable (using pipes for simplicity)
-  
-  uis_coded <- uis_raw %>% 
-    mutate(building_size=factor(case_when(grepl("_003$|_014$", variable) ~ "Single Family",
-                                            grepl("_004$|_005$|_006$|_007$|_015$|_016$|_017$|_018$", variable) ~ "2-9 units",
-                                            grepl("_008$|_019$", variable) ~ "10-19 units",
-                                            grepl("_009$|_010$|_020$|_021$", variable) ~ "20+ units",
-                                            grepl("_011$|_012$|_022$|_023$", variable) ~ "Mobile Home/Other",
-                                            TRUE ~ NA_character_),
-                                  levels=c("Single Family","2-9 units","10-19 units", "20+ units", "Mobile Home/Other")))
-  
-  # Aggregate data
-  # In this step, you create an aggregate, using the grouping you created in the last call.
-  uis_agg <- summarize(uis_raw, estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE)) 
-  
-  
-  # In this step, you create an aggregate, using the first grouping you created in the last call.
-  uis_agg_01 <- uis_coded %>% 
-    group_by(across(c(name, year, building_size))) %>% 
-    summarize(estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE))
-  
-}
-
+# All Occupied Units------------------------
 # Summarize data into one table, sort by building size
-# iterate thru each year in the function, stored a list. Combine lists and order output by building size category
-
 all_compare <- map(compared_years, ~create_uis_compare(.x)) %>% 
   reduce(bind_rows)
 
@@ -346,9 +388,6 @@ all_compare <- all_compare %>%
   filter(building_size != is.na(building_size))
 
 # Chart by density of units, per county, over time (should not compare overlapping 5 YR estimates!!)
-library(psrcplot)
-library(ggplot2)
-
 middle_density <- all_compare %>%
   filter(building_size == '2-9 units') %>%
   ungroup()
@@ -366,44 +405,7 @@ mod_density_chart <- interactive_line_chart(moderate_density, "year", "estimate"
                                 title="Moderate Density Units (10-19)",color="pgnobgy_10")
 mod_density_chart
 
-# Renter Occupied Units-----------------------
-
-create_uis_renter_compare <- function(compared_year) {
-  
-  # Grab data from Census API
-  uis_raw<-get_acs_recs(geography = 'county',
-                        table.names = c('B25032'),
-                        years = compared_year,
-                        counties = c("King", "Kitsap", "Pierce", "Snohomish"),
-                        acs.type = 'acs5')
-  
-  # Create custom groupings
-  # The next step is to create the appropriate grouping variable (using pipes for simplicity)
-  
-  uis_coded <- uis_raw %>% 
-    mutate(building_size=factor(case_when(grepl("_014$", variable) ~ "Single Family",
-                                          grepl("_015$|_016$|_017$|_018$", variable) ~ "2-9 units",
-                                          grepl("_019$", variable) ~ "10-19 units",
-                                          grepl("_020$|_021$", variable) ~ "20+ units",
-                                          grepl("_022$|_023$", variable) ~ "Mobile Home/Other",
-                                          TRUE ~ NA_character_),
-                                levels=c("Single Family","2-9 units","10-19 units", "20+ units", "Mobile Home/Other")))
-  
-  # Aggregate data
-  # In this step, you create an aggregate, using the grouping you created in the last call.
-  uis_agg_renter <- summarize(uis_raw, estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE)) 
-  
-  
-  # In this step, you create an aggregate, using the first grouping you created in the last call.
-  uis_agg_renter_01 <- uis_coded %>% 
-    group_by(across(c(name, year, building_size))) %>% 
-    summarize(estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE))
-  
-}
-
-# Summarize data into one table, sort by building size
-# iterate thru each year in the function, stored a list. Combine lists and order output by building size category
-
+# Renter Occupied Charts -----------------------
 all_renter_compare <- map(compared_years, ~create_uis_renter_compare(.x)) %>% 
   reduce(bind_rows)
 
@@ -421,9 +423,6 @@ all_renter_compare <- all_renter_compare %>%
   filter(building_size != is.na(building_size))
 
 # Chart by density of units, per county, over time (should not compare overlapping 5 YR estimates!!)
-library(psrcplot)
-library(ggplot2)
-
 middle_density <- all_renter_compare %>%
   filter(building_size == '2-9 units') %>%
   ungroup()
@@ -441,44 +440,7 @@ mod_density_chart <- interactive_line_chart(moderate_density, "year", "estimate"
                                             title="Moderate Density Renter Units (10-19)",color="pgnobgy_10")
 mod_density_chart
 
-# Owner Occupied Units-----------------------
-
-create_uis_owner_compare <- function(compared_year) {
-  
-  # Grab data from Census API
-  uis_raw<-get_acs_recs(geography = 'county',
-                        table.names = c('B25032'),
-                        years = compared_year,
-                        counties = c("King", "Kitsap", "Pierce", "Snohomish"),
-                        acs.type = 'acs5')
-  
-  # Create custom groupings
-  # The next step is to create the appropriate grouping variable (using pipes for simplicity)
-  
-  uis_coded <- uis_raw %>% 
-    mutate(building_size=factor(case_when(grepl("_003$", variable) ~ "Single Family",
-                                          grepl("_004$|_005$|_006$|_007$", variable) ~ "2-9 units",
-                                          grepl("_008$", variable) ~ "10-19 units",
-                                          grepl("_009$|_010$", variable) ~ "20+ units",
-                                          grepl("_011$|_012$", variable) ~ "Mobile Home/Other",
-                                          TRUE ~ NA_character_),
-                                levels=c("Single Family","2-9 units","10-19 units", "20+ units", "Mobile Home/Other")))
-  
-  # Aggregate data
-  # In this step, you create an aggregate, using the grouping you created in the last call.
-  uis_agg_owner <- summarize(uis_raw, estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE)) 
-  
-  
-  # In this step, you create an aggregate, using the first grouping you created in the last call.
-  uis_agg_owner_01 <- uis_coded %>% 
-    group_by(across(c(name, year, building_size))) %>% 
-    summarize(estimate=sum(estimate, na.rm=TRUE), moe=moe_sum(moe=moe, estimate=estimate, na.rm=TRUE))
-  
-}
-
-# Summarize data into one table, sort by building size
-# iterate thru each year in the function, stored a list. Combine lists and order output by building size category
-
+# Owner Occupied Charts -----------------------
 all_owner_compare <- map(compared_years, ~create_uis_owner_compare(.x)) %>% 
   reduce(bind_rows)
 
@@ -496,9 +458,6 @@ all_owner_compare <- all_owner_compare %>%
   filter(building_size != is.na(building_size))
 
 # Chart by density of units, per county, over time (should not compare overlapping 5 YR estimates!!)
-library(psrcplot)
-library(ggplot2)
-
 middle_density <- all_owner_compare %>%
   filter(building_size == '2-9 units') %>%
   ungroup()
@@ -515,3 +474,18 @@ moderate_density <- all_owner_compare %>%
 mod_density_chart <- interactive_line_chart(moderate_density, "year", "estimate", fill = "name",
                                             title="Moderate Density Owner Units (10-19)",color="pgnobgy_10")
 mod_density_chart
+
+# Export tables for Excel------------------------
+work_book <- createWorkbook()
+addWorksheet(work_book, sheetName = "Owners 5YR ACS")
+addWorksheet(work_book, sheetName = "Renters 5YR ACS")
+writeData(work_book, "Owners 5YR ACS", df_uis_owner_smalltbl)
+writeData(work_book, "Renters 5YR ACS", df_uis_renter_smalltbl)
+
+# Create a percent style
+pct = createStyle(numFmt="PERCENTAGE")
+
+# Add the percent style to the desired cells
+addStyle(work_book, "Owners 5YR ACS", style=pct, cols=share_cols_owner, rows=2:(nrow(df_uis_owner_smalltbl)+1), gridExpand=TRUE)
+addStyle(work_book, "Renters 5YR ACS", style=pct, cols=share_cols_renter, rows=2:(nrow(df_uis_renter_smalltbl)+1), gridExpand=TRUE)
+saveWorkbook(work_book, file = "metric03_raw.xlsx", overwrite = TRUE)
