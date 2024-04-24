@@ -143,10 +143,17 @@ tenure_inc_func <- function(year){
 tenure_inc_re_all <- map(years, ~tenure_inc_func(.x)) %>%
   reduce(bind_rows)
 
+# Format small tables to be exported ------------------------
+tenure_re_smalltbl <- pivot_wider(tenure_re_piv_all,id_cols = PRACE, names_from = DATA_YEAR, values_from = c(share_owner, share_moe_owner))
+
+tenure_inc_re_smalltbl <- tenure_inc_re_all %>% 
+  select(DATA_YEAR,PRACE, `share_Under $50,000`, `share_$50,000-$74,999`, `share_$75,000-$99,999`, `share_$100,000-$149,999`, `share_$150,000-$199,999`, `share_$200,000 or more`,
+         `share_moe_Under $50,000`, `share_moe_$50,000-$74,999`, `share_moe_$75,000-$99,999`, `share_moe_$75,000-$99,999`, `share_moe_$100,000-$149,999`, `share_moe_$150,000-$199,999`, `share_moe_$200,000 or more`)
+
 #-------------- Write to Excel --------------
 work_book <- createWorkbook()
 addWorksheet(work_book, sheetName = "tenure by RE")
-writeData(work_book, "tenure by RE", tenure_re_piv_all)
+writeData(work_book, "tenure by RE", tenure_re_smalltbl)
 addWorksheet(work_book, sheetName = "ownership by RE & inc")
-writeData(work_book, "ownership by RE & inc", tenure_inc_re_all)
+writeData(work_book, "ownership by RE & inc", tenure_inc_re_smalltbl)
 saveWorkbook(work_book, file = "metric05_raw.xlsx", overwrite = TRUE)
