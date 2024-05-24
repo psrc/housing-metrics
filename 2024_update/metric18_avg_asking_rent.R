@@ -1,5 +1,5 @@
 # Processing Raw CoStar Data for Housing Monitoring
-# Geographies: RGCs, HCTs, Counties, Region
+# Geographies: RGCs, HCTs, Counties
 # Data Vintage: Q2 2024 QTD
 # Created By: Eric Clute
 
@@ -14,8 +14,11 @@ hct_data_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric18_
 county_data_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric18_avg_asking_rent/raw_county"
 reference_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric18_avg_asking_rent/reference_table.xlsx"
 export_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric18_avg_asking_rent"
-source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 5/20/2024. Includes all data inside RGC/HCT (excludes Federal Way, Issaquah, Port Orchard Ferry Terminal, and Poulsbo due to missing data). Rent rounded to nearest 10")
-region_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 5/20/2024. Rent rounded to nearest 10")
+rgc_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 5/23/2024. Includes all data inside RGC (excludes Federal Way, Issaquah due to missing data). Rent rounded to nearest 10")
+hct_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 5/23/2024. Includes all data inside HCT (excludes Port Orchard Ferry Terminal, and Poulsbo due to missing data). Rent rounded to nearest 10")
+county_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 5/23/2024. Includes all data inside county. Rent rounded to nearest 10")
+
+
 
 # Create Functions ---------------------
 # Function to read Excel file, extract column names and first row, and add filename as a column
@@ -29,7 +32,7 @@ read_excel_with_filename <- function(file_path) {
   
   # Add filename as a column without the .xlsx extension
   filename <- gsub("\\.xlsx$", "", basename(file_path))
-  first_row$rgc <- filename
+  first_row$name <- filename
   
   # Convert all columns to character type
   first_row <- mutate_all(first_row, as.character)
@@ -43,7 +46,7 @@ combine_data <- function(data_list) {
   result <- combined_data
   for (i in seq_along(data_list)) {
     filename <- gsub("\\.xlsx$", "", basename(xlsx_files[i]))
-    data_list[[i]]$first_row$rgc <- filename
+    data_list[[i]]$first_row$name <- filename
     # Convert all columns to character type
     data_list[[i]]$first_row <- mutate_all(data_list[[i]]$first_row, as.character)
     result <- bind_rows(result, data_list[[i]]$first_row)
@@ -51,42 +54,7 @@ combine_data <- function(data_list) {
   result
 }
 
-# Clean county data and generate regional numbers (inside and outside of RGCs) --------------------
-xlsx_files <- list.files(county_data_path, pattern = "\\.xlsx$", full.names = TRUE) # Get a list of all Excel files in the folder
-excel_data <- map(xlsx_files, read_excel_with_filename) # Read all Excel files
-all_col_names <- excel_data %>% map("col_names") %>% reduce(union) # Combine all column names into one vector
-combined_data <- tibble::tibble(!!!set_names(rep(list(NULL), length(all_col_names)), all_col_names)) # Create an empty data frame with all column names
-
-combined_data <- combine_data(excel_data)
-
-by_fullregion <- combined_data %>%
-  select(rgc, `Inventory Units`, `Asking Rent Per Unit`) %>%
-  mutate(`Asking Rent Per Unit` = as.numeric(`Asking Rent Per Unit`),
-         `Inventory Units` = as.numeric(`Inventory Units`)) %>%
-  rename(geography = rgc)
-
-# Calculate aggregate rent collected
-by_fullregion <- by_fullregion %>%
-  mutate(`Asking Rent Per Unit` = as.numeric(`Asking Rent Per Unit`),
-         `Inventory Units` = as.numeric(`Inventory Units`))
-
-by_fullregion$agg_askingrent <- (by_fullregion$`Asking Rent Per Unit` * by_fullregion$`Inventory Units`)
-
-# Calculate average rent
-by_fullregion <- by_fullregion %>%
-  summarise(
-    geography = "region",
-    `Inventory Units` = sum(`Inventory Units`),
-    `agg_askingrent` = sum(`agg_askingrent`)
-  ) %>%
-  select(geography, `Inventory Units`, `agg_askingrent`)
-
-by_fullregion$avg_askingrent = by_fullregion$agg_askingrent / by_fullregion$`Inventory Units`
-
-by_fullregion <- by_fullregion %>%
-  select(-agg_askingrent)
-
-# Combine Individual Center's Data Together  ---------------------
+# Combine RGC files Together  ---------------------
 xlsx_files <- list.files(rgc_data_path, pattern = "\\.xlsx$", full.names = TRUE) # Get a list of all Excel files in the folder
 excel_data <- map(xlsx_files, read_excel_with_filename) # Read all Excel files
 all_col_names <- excel_data %>% map("col_names") %>% reduce(union) # Combine all column names into one vector
@@ -94,102 +62,81 @@ combined_data <- tibble::tibble(!!!set_names(rep(list(NULL), length(all_col_name
 
 # Call the function to combine data from all Excel files
 combined_data <- combine_data(excel_data)
+rgc_data <- combined_data
 
-# Formatting & Calculating New Field ---------------------
+# Combine HCT files Together  ---------------------
+xlsx_files <- list.files(hct_data_path, pattern = "\\.xlsx$", full.names = TRUE) # Get a list of all Excel files in the folder
+excel_data <- map(xlsx_files, read_excel_with_filename) # Read all Excel files
+all_col_names <- excel_data %>% map("col_names") %>% reduce(union) # Combine all column names into one vector
+combined_data <- tibble::tibble(!!!set_names(rep(list(NULL), length(all_col_names)), all_col_names)) # Create an empty data frame with all column names
+
+# Call the function to combine data from all Excel files
+combined_data <- combine_data(excel_data)
+hct_data <- combined_data
+
+# Combine county files Together  ---------------------
+xlsx_files <- list.files(county_data_path, pattern = "\\.xlsx$", full.names = TRUE) # Get a list of all Excel files in the folder
+excel_data <- map(xlsx_files, read_excel_with_filename) # Read all Excel files
+all_col_names <- excel_data %>% map("col_names") %>% reduce(union) # Combine all column names into one vector
+combined_data <- tibble::tibble(!!!set_names(rep(list(NULL), length(all_col_names)), all_col_names)) # Create an empty data frame with all column names
+
+# Call the function to combine data from all Excel files
+combined_data <- combine_data(excel_data)
+county_data <- combined_data
+
+combined_data <- rbind(rgc_data, hct_data, county_data)
+
+# Formatting & Calculating New Fields ---------------------
 
 # Remove unneeded fields
 combined_data <- combined_data %>%
-  select(rgc, `Inventory Units`, `Asking Rent Per Unit`)
+  select(name, `Inventory Units`, `Asking Rent Per Unit`)
+
+# Cleanup
+combined_data$`Asking Rent Per Unit` <- as.numeric(combined_data$`Asking Rent Per Unit`)
+combined_data$`Inventory Units` <- as.numeric((combined_data$`Inventory Units`))
+combined_data$`Asking Rent Per Unit` <- round(combined_data$`Asking Rent Per Unit` / 10) * 10
 
 # Combine w/reference table
 reference_table <- read_excel(reference_path)
-combined_data <- left_join(combined_data, reference_table, by = "rgc")
+combined_data <- left_join(combined_data, reference_table, by = "name")
 
-# Create aggregate rent field for final tabulation of avg rents across centers
-combined_data <- combined_data %>%
-  mutate(`Asking Rent Per Unit` = as.numeric(`Asking Rent Per Unit`),
-         `Inventory Units` = as.numeric(`Inventory Units`))
+# Summarize by various geos ---------------------
 
-combined_data$agg_askingrent <- (combined_data$`Asking Rent Per Unit` * combined_data$`Inventory Units`)
+# Summarize by Center
+by_rgc <- combined_data %>%
+  filter(type == "rgc") %>%
+  select(name, `Inventory Units`, `Asking Rent Per Unit`, type, county)
 
-# Summarize by all centers in region
-by_allcenters <- combined_data %>%
-  summarize(
-    `Inventory Units` = sum(`Inventory Units`, na.rm = TRUE),
-    agg_askingrent = sum(agg_askingrent, na.rm = TRUE))
+# Summarize by Center
+by_hct <- combined_data %>%
+  filter(type == "hct") %>%
+  select(name, `Inventory Units`, `Asking Rent Per Unit`, type, county)
 
-by_allcenters$avg_askingrent = by_allcenters$agg_askingrent / by_allcenters$`Inventory Units`
-
-by_allcenters <- by_allcenters %>%
-  select(-agg_askingrent)
-
-by_allcenters$geography <- "all centers"
-
-by_allcenters <- by_allcenters %>%
-  select(geography, everything())
-
-# Summarize by County
+# Summarize by Center
 by_county <- combined_data %>%
-  group_by(county) %>%
-  summarize(
-    `Inventory Units` = sum(`Inventory Units`, na.rm = TRUE),
-    agg_askingrent = sum(agg_askingrent, na.rm = TRUE))
+  filter(is.na(type)) %>%
+  select(name, `Inventory Units`, `Asking Rent Per Unit`)
 
-by_county$avg_askingrent = by_county$agg_askingrent / by_county$`Inventory Units`
-
-by_county <- by_county %>%
-  select(-agg_askingrent)
-
-# Summarize by Center Type
-by_centertype <- combined_data %>%
-  group_by(center_type) %>%
-  summarize(
-    `Inventory Units` = sum(`Inventory Units`, na.rm = TRUE),
-    agg_askingrent = sum(agg_askingrent, na.rm = TRUE))
-
-by_centertype$avg_askingrent = by_centertype$agg_askingrent / by_centertype$`Inventory Units`
-
-by_centertype <- by_centertype %>%
-  select(-agg_askingrent)
-
-# Summarize by Center (name)
-by_center <- combined_data %>%
-  select(rgc, `Inventory Units`, `Asking Rent Per Unit`, center_type, county)
-
-# Rounding estimates
-by_center$`Asking Rent Per Unit` <- round(by_center$`Asking Rent Per Unit` / 10) * 10
-by_centertype$avg_askingrent <- round(by_centertype$avg_askingrent / 10) * 10
-by_county$avg_askingrent <- round(by_county$avg_askingrent / 10) * 10
-by_allcenters$avg_askingrent <- round(by_allcenters$avg_askingrent / 10) * 10
-by_fullregion$avg_askingrent <- round(by_fullregion$avg_askingrent / 10) * 10
+# Cleanup and export ---------------------
 
 # Export Data
-export_file <- paste0(export_path, "/metric21.xlsx")
+export_file <- paste0(export_path, "/metric18_raw.xlsx")
 work_book <- createWorkbook()
 
-# Add the "by_center" sheet
-addWorksheet(work_book, sheetName = "by_center")
-writeData(work_book, sheet = "by_center", by_center)
-writeData(work_book, sheet = "by_center", x = data.frame(source_info), startRow = nrow(by_center) + 3, startCol = 1)
+# Add the "by_rgc" sheet
+addWorksheet(work_book, sheetName = "by_rgc")
+writeData(work_book, sheet = "by_rgc", by_rgc)
+writeData(work_book, sheet = "by_rgc", x = data.frame(rgc_source_info), startRow = nrow(by_rgc) + 3, startCol = 1)
 
-# Add the "by_centertype" sheet
-addWorksheet(work_book, sheetName = "by_centertype")
-writeData(work_book, sheet = "by_centertype", by_centertype)
-writeData(work_book, sheet = "by_centertype", x = data.frame(source_info), startRow = nrow(by_centertype) + 3, startCol = 1)
+# Add the "by_hct" sheet
+addWorksheet(work_book, sheetName = "by_hct")
+writeData(work_book, sheet = "by_hct", by_hct)
+writeData(work_book, sheet = "by_hct", x = data.frame(hct_source_info), startRow = nrow(by_hct) + 3, startCol = 1)
 
 # Add the "by_county" sheet
 addWorksheet(work_book, sheetName = "by_county")
 writeData(work_book, sheet = "by_county", by_county)
-writeData(work_book, sheet = "by_county", x = data.frame(source_info), startRow = nrow(by_county) + 3, startCol = 1)
-
-# Add the "by_allcenters" sheet
-addWorksheet(work_book, sheetName = "by_allcenters")
-writeData(work_book, sheet = "by_allcenters", by_allcenters)
-writeData(work_book, sheet = "by_allcenters", x = data.frame(source_info), startRow = nrow(by_allcenters) + 3, startCol = 1)
-
-# Add the "by_fullregion" sheet
-addWorksheet(work_book, sheetName = "by_fullregion")
-writeData(work_book, sheet = "by_fullregion", by_fullregion)
-writeData(work_book, sheet = "by_fullregion", x = data.frame(region_source_info), startRow = nrow(by_fullregion) + 3, startCol = 1)
+writeData(work_book, sheet = "by_county", x = data.frame(county_source_info), startRow = nrow(by_county) + 3, startCol = 1)
 
 saveWorkbook(work_book, file = export_file, overwrite = TRUE)
