@@ -14,9 +14,9 @@ hct_data_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric18_
 county_data_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric18_avg_asking_rent/raw_county"
 reference_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric18_avg_asking_rent/reference_table.xlsx"
 export_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric18_avg_asking_rent"
-rgc_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 5/23/2024. Includes all data inside RGC (excludes Federal Way, Issaquah due to missing data). Rent rounded to nearest 10")
-hct_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 5/23/2024. Includes all data inside HCT (excludes Port Orchard Ferry Terminal, and Poulsbo due to missing data). Rent rounded to nearest 10")
-county_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 5/23/2024. Includes all data inside county. Rent rounded to nearest 10")
+rgc_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 6/27/2024. Includes all data inside RGC (excludes Federal Way, Issaquah due to missing data). Rent rounded to nearest 10")
+hct_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 6/27/2024. Includes all data inside HCT (excludes Port Orchard Ferry Terminal, Poulsbo, Mukilteo due to missing data). Rent rounded to nearest 10")
+county_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 6/27/2024. Includes all data inside county. Rent rounded to nearest 10")
 
 
 
@@ -97,6 +97,10 @@ combined_data$`Asking Rent Per Unit` <- as.numeric(combined_data$`Asking Rent Pe
 combined_data$`Inventory Units` <- as.numeric((combined_data$`Inventory Units`))
 combined_data$`Asking Rent Per Unit` <- round(combined_data$`Asking Rent Per Unit` / 10) * 10
 
+# Remove with less than 50 units
+removed <- subset(combined_data, `Inventory Units` < 50)
+combined_data <- subset(combined_data, `Inventory Units` >= 50)
+
 # Combine w/reference table
 reference_table <- read_excel(reference_path)
 combined_data <- left_join(combined_data, reference_table, by = "name")
@@ -121,7 +125,7 @@ by_county <- combined_data %>%
 # Cleanup and export ---------------------
 
 # Export Data
-export_file <- paste0(export_path, "/metric18_raw.xlsx")
+export_file <- paste0(export_path, "/metric18_raw_1bdrm.xlsx")
 work_book <- createWorkbook()
 
 # Add the "by_rgc" sheet
