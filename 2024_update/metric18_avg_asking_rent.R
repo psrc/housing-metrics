@@ -8,17 +8,21 @@ library(readxl)
 library(dplyr)
 library(purrr)
 library(openxlsx)
+library(tidyr)
 
 rgc_data_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric18_avg_asking_rent/raw_rgc"
 hct_data_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric18_avg_asking_rent/raw_hct"
 county_data_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric18_avg_asking_rent/raw_county"
 reference_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric18_avg_asking_rent/reference_table.xlsx"
 export_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric18_avg_asking_rent"
-rgc_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 6/27/2024. Includes all data inside RGC (excludes Federal Way, Issaquah due to missing data). Rent rounded to nearest 10")
-hct_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 6/27/2024. Includes all data inside HCT (excludes Port Orchard Ferry Terminal, Poulsbo, Mukilteo due to missing data). Rent rounded to nearest 10")
-county_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 6/27/2024. Includes all data inside county. Rent rounded to nearest 10")
+rgc_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 6/27/2024. Includes all 1-bedroom unit data inside RGC (excludes Federal Way, Issaquah due to missing data). Rent rounded to nearest 10")
+hct_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 6/27/2024. Includes all 1-bedroom unit data inside HCT (excludes Port Orchard Ferry Terminal, Poulsbo, Mukilteo due to missing data). Rent rounded to nearest 10")
+county_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 6/27/2024. Includes all 1-bedroom unit data inside county. Rent rounded to nearest 10")
 
+latestdate <- "2024 Q2 QTD"
+earliestdate <- "2019 Q2"
 
+reference_table <- read_excel(reference_path)
 
 # Create Functions ---------------------
 # Function to read Excel file, extract column names and first row, and add filename as a column
@@ -28,7 +32,7 @@ read_excel_with_filename <- function(file_path) {
   
   # Extract column names and first row of data
   col_names <- colnames(data)
-  first_row <- slice(data, 1)
+  first_row <- slice(data, which(data$Period %in% c(latestdate, earliestdate)))
   
   # Add filename as a column without the .xlsx extension
   filename <- gsub("\\.xlsx$", "", basename(file_path))
@@ -90,7 +94,7 @@ combined_data <- rbind(rgc_data, hct_data, county_data)
 
 # Remove unneeded fields
 combined_data <- combined_data %>%
-  select(name, `Inventory Units`, `Asking Rent Per Unit`)
+  select(name, Period, `Inventory Units`, `Asking Rent Per Unit`)
 
 # Cleanup
 combined_data$`Asking Rent Per Unit` <- as.numeric(combined_data$`Asking Rent Per Unit`)
@@ -101,26 +105,32 @@ combined_data$`Asking Rent Per Unit` <- round(combined_data$`Asking Rent Per Uni
 removed <- subset(combined_data, `Inventory Units` < 50)
 combined_data <- subset(combined_data, `Inventory Units` >= 50)
 
+# Pivot & calculate change over time
+combined_data_piv <- combined_data %>% pivot_wider(id_cols = 'name', names_from = 'Period', values_from = c('Inventory Units', 'Asking Rent Per Unit'))
+
+ed <- paste0("Asking Rent Per Unit_", earliestdate) # Construct the field name dynamically
+ld <- paste0("Asking Rent Per Unit_", latestdate) # Construct the field name dynamically
+combined_data_piv$prct_change_rent <- (combined_data_piv[[ld]] - combined_data_piv[[ed]]) / combined_data_piv[[ed]]
+
 # Combine w/reference table
-reference_table <- read_excel(reference_path)
-combined_data <- left_join(combined_data, reference_table, by = "name")
+combined_data_piv <- left_join(combined_data_piv, reference_table, by = "name")
 
 # Summarize by various geos ---------------------
 
 # Summarize by Center
-by_rgc <- combined_data %>%
+by_rgc <- combined_data_piv %>%
   filter(type == "rgc") %>%
-  select(name, `Inventory Units`, `Asking Rent Per Unit`, type, county)
+  select(name, starts_with("Inventory Units_"), starts_with("Asking Rent Per Unit_"), prct_change_rent, type, county)
 
 # Summarize by Center
-by_hct <- combined_data %>%
+by_hct <- combined_data_piv %>%
   filter(type == "hct") %>%
-  select(name, `Inventory Units`, `Asking Rent Per Unit`, type, county)
+  select(name, starts_with("Inventory Units_"), starts_with("Asking Rent Per Unit_"), prct_change_rent, type, county)
 
 # Summarize by Center
-by_county <- combined_data %>%
+by_county <- combined_data_piv %>%
   filter(is.na(type)) %>%
-  select(name, `Inventory Units`, `Asking Rent Per Unit`)
+  select(name, starts_with("Inventory Units_"), starts_with("Asking Rent Per Unit_"), prct_change_rent, type, county)
 
 # Cleanup and export ---------------------
 
