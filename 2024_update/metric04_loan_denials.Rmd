@@ -1,7 +1,7 @@
 ---
 title: "loan_denial_rates"
 author: "Eric Clute & Meg Grzybowski"
-date: "2024-01-25"
+date: "2024-07-11"
 output:
   html_document:
     df_print: paged
@@ -9,7 +9,9 @@ output:
 
 ```{r setup, include=FALSE}
 
-# NOTES: This analysis was completed for the February 2024 equity trend (https://www.psrc.org/media/8436). Data saved to 2023 monitoring directories since the data was collected for that project. New data may be available from the FFIEC in June. In future years consider pulling data into R directly using JSON, API
+# NOTES: This analysis was originally completed for the February 2024 equity trend using 2018-2022 data (https://www.psrc.org/media/8436). Data saved to 2023 monitoring directories since the data was collected for that project. 
+
+# New data was made available from the FFIEC in July 2024. In future years consider pulling data into R directly using JSON, API. 2023 data was cleaned to match table formatting of 2022 - watch this in future years!
 
 
 library(magrittr)
@@ -40,14 +42,14 @@ install_psrc_fonts()
 
 ```{r, set location}
 #setwd('J:/Projects/V2050/Housing/Monitoring/2023Update')
-network_file_loc<-'J:/Projects/V2050/Housing/Monitoring/2023Update/Metrics/Loan Denials- FFIEC'
+network_file_loc<-'J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric04_loan_denials'
 ```
 
 ### Christy automation --- code review
 
 ```{r, read csvs}
 
-years <- 2018:2022
+years <- 2018:2023
 
 # data collected here: https://ffiec.cfpb.gov/data-publication/aggregate-reports/.
 # element names will be used for the region column and naming elements in master list. Adjust here.
@@ -100,9 +102,9 @@ region_clean <- rbind(dfs$bsp, dfs$sb, dfs$tl)
 
 # create plots
 
-```{r, chart 1 - Loan Denial Rates by Race and Ethnicity (2022)}
+```{r, chart 1 - Loan Denial Rates by Race and Ethnicity (2023)}
 
-region_race_22 <- region_clean[region_clean$race_ethnicity %in% c("American Indian or Alaska Native", "Asian",
+region_race_23 <- region_clean[region_clean$race_ethnicity %in% c("American Indian or Alaska Native", "Asian",
                                                                   "Black or African American", "Hispanic or Latino",
                                                                   "Native Hawaiian or Other Pacific Islander",
                                                                   "2 or more minority races", "White"), ] %>%
@@ -114,26 +116,26 @@ region_race_22 <- region_clean[region_clean$race_ethnicity %in% c("American Indi
                                       "Black", "Hispanic or Latino",
                                       "Native Hawaiian or Other Pacific Islander",
                                       "Two or more non-white races", "White")) %>%
-  filter(data_year == "2022")%>%
+  filter(data_year == "2023")%>%
   group_by(race_ethnicity)%>%
   summarise(received=sum(received),
             denied=(sum(denied)))
 
-region_race_22$share_denials_race <- region_race_22$denied/region_race_22$received
+region_race_23$share_denials_race <- region_race_23$denied/region_race_23$received
 
-race_22_bar <- static_bar_chart(t= region_race_22,
+race_23_bar <- static_bar_chart(t= region_race_23,
                                 x = "share_denials_race",
                                 y = "race_ethnicity",
                                 fill = "race_ethnicity",
-                                title = "Loan Denial Rates by Race and Ethnicity (2022)",
+                                title = "Loan Denial Rates by Race and Ethnicity (2023)",
                                 subtitle = "Federal Financial Institutions Examination Council (FFIEC), 
 Home Mortgage DIsclosure Act (HMDA) Database",
                                              color = "psrc_light")
 
-race_22_bar
+race_23_bar
 ```
 
-```{r, chart 2 - Time Series Loan Denial Rates by Race and Ethnicity (2018-2022)}
+```{r, chart 2 - Time Series Loan Denial Rates by Race and Ethnicity (2018-2023)}
 region_timeseries <- region_clean[region_clean$race_ethnicity %in% c("Asian", "Black or African American", "Hispanic or Latino", "White"), ] %>%
   mutate(race_ethnicity = fct_relevel(race_ethnicity, "Asian", "Black or African American", "Hispanic or Latino", "White")) %>%
   group_by(data_year, race_ethnicity) %>%
@@ -151,9 +153,9 @@ denial_race_static_line <- static_line_chart(t= region_timeseries,
                                             breaks = NULL,
                                             lwidth = 1,
                                             color = "psrc_light",
-                                            title = "Loan Denial Rates by Race and Ethnicity (2018-2022)",
+                                            title = "Loan Denial Rates by Race and Ethnicity (2018-2023)",
                                             subtitle = "Federal Financial Institutions Examination Council (FFIEC), HMDA Database") +
-  scale_y_continuous(limits = c(0.00, 0.25),
+  scale_y_continuous(limits = c(0.00, 0.30),
                        labels = scales::percent)
 
 
@@ -161,28 +163,28 @@ denial_race_static_line
 
 ```
 
-```{r, chart 3 - Loan Denial Rates by Income and Race/Ethnicity (2022)}
+```{r, chart 3 - Loan Denial Rates by Income and Race/Ethnicity (2023)}
 
-region_22_income_race <- region_clean[region_clean$race_ethnicity %in% c("White", "Asian","Black or African American", "Hispanic or Latino"), ] %>%
+region_23_income_race <- region_clean[region_clean$race_ethnicity %in% c("White", "Asian","Black or African American", "Hispanic or Latino"), ] %>%
   mutate(median_income = fct_relevel(median_income, 
                                      "less than 50%", "50-79%", "80-99%", "100-119%", "120% or more")) %>%
-  filter(data_year == "2022") %>%
+  filter(data_year == "2023") %>%
   group_by(median_income, race_ethnicity)%>%
   summarise(received=sum(received),
             denied=(sum(denied)))
 
-region_22_income_race$share_denials_race <- region_22_income_race$denied/region_22_income_race$received
-region_22_income_race$region <- "Region"
+region_23_income_race$share_denials_race <- region_23_income_race$denied/region_23_income_race$received
+region_23_income_race$region <- "Region"
 
-race_income_22_column <- static_column_chart(t= region_22_income_race,
+race_income_23_column <- static_column_chart(t= region_23_income_race,
                                              x = "median_income",
                                              y = "share_denials_race",
                                              fill = "race_ethnicity",
-                                             title = "Loan Denial Rates by Income Bracket and Race/Ethnicity (2022)",
+                                             title = "Loan Denial Rates by Income Bracket and Race/Ethnicity (2023)",
                                              subtitle = "Federal Financial Institutions Examination Council (FFIEC), HMDA Database",
                                              color = "psrc_light")
 
-race_income_22_column
+race_income_23_column
 
 ```
 
