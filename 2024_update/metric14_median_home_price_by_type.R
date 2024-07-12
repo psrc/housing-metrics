@@ -1,7 +1,7 @@
 # TITLE: Median Home Price by Type
 # GEOGRAPHIES: King and Snohomish Only (limited by Redfin)
 # DATA SOURCE: Redfin
-# DATE MODIFIED: 3.29.2024
+# DATE MODIFIED: 7.12.2024
 # AUTHOR: Eric Clute
 
 library(tidyverse)
@@ -13,7 +13,7 @@ save_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric14_medi
 
 metro_area <- "Seattle, WA"
 earliestdate <- "2012-07-01"
-latestdate <- "2024-02-01"
+latestdate <- "2024-06-01"
 
 # Import Redfin data, limit to metro area and by date
 redfin_raw <- read_tsv(value_url)

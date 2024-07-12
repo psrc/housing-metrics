@@ -9,18 +9,25 @@ library(dplyr)
 library(purrr)
 library(openxlsx)
 library(tidyr)
+library(fredr) # Requires API key
+library(psrccensus) # Required for inflation adjustment
+
+fredr_set_key("99e2d81f189630d83b9e37ba8ca4f142")
 
 rgc_data_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric18_avg_asking_rent/raw_rgc"
 hct_data_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric18_avg_asking_rent/raw_hct"
 county_data_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric18_avg_asking_rent/raw_county"
 reference_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric18_avg_asking_rent/reference_table.xlsx"
 export_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric18_avg_asking_rent"
-rgc_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 6/27/2024. Includes all 1-bedroom unit data inside RGC (excludes Federal Way, Issaquah due to missing data). Rent rounded to nearest 10")
-hct_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 6/27/2024. Includes all 1-bedroom unit data inside HCT (excludes Port Orchard Ferry Terminal, Poulsbo, Mukilteo due to missing data). Rent rounded to nearest 10")
-county_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 6/27/2024. Includes all 1-bedroom unit data inside county. Rent rounded to nearest 10")
+rgc_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 7/12/2024. Includes all 1-bedroom unit data inside RGC (excludes Federal Way, Issaquah due to missing data). Rent rounded to nearest 10. Inflation adjusted to 2024 dollars.")
+hct_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 7/12/2024. Includes all 1-bedroom unit data inside HCT (excludes Port Orchard Ferry Terminal, Poulsbo, Mukilteo due to missing data). Rent rounded to nearest 10. Inflation adjusted to 2024 dollars.")
+county_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 7/12/2024. Includes all 1-bedroom unit data inside county. Rent rounded to nearest 10. Inflation adjusted to 2024 dollars.")
 
 latestdate <- "2024 Q2 QTD"
 earliestdate <- "2019 Q2"
+
+inflation_year <- (2024)
+reported_year_to_adjust <- (2019)
 
 reference_table <- read_excel(reference_path)
 
@@ -105,11 +112,15 @@ combined_data$`Asking Rent Per Unit` <- round(combined_data$`Asking Rent Per Uni
 removed <- subset(combined_data, `Inventory Units` < 50)
 combined_data <- subset(combined_data, `Inventory Units` >= 50)
 
-# Pivot & calculate change over time
+# Pivot & calculate change over time (adjust for inflation)
 combined_data_piv <- combined_data %>% pivot_wider(id_cols = 'name', names_from = 'Period', values_from = c('Inventory Units', 'Asking Rent Per Unit'))
+
+combined_data_piv$inflation_adjustment <- pce_deflator(reported_year_to_adjust, inflation_year) # create inflation percentage
 
 ed <- paste0("Asking Rent Per Unit_", earliestdate) # Construct the field name dynamically
 ld <- paste0("Asking Rent Per Unit_", latestdate) # Construct the field name dynamically
+
+combined_data_piv[[ed]] <- combined_data_piv[[ed]] * combined_data_piv$inflation_adjustment
 combined_data_piv$prct_change_rent <- (combined_data_piv[[ld]] - combined_data_piv[[ed]]) / combined_data_piv[[ed]]
 
 # Combine w/reference table
