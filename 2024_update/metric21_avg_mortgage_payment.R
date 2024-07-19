@@ -16,11 +16,11 @@ library(ggplot2)
 # assumptions
 metro_area <- "Seattle, WA"
 
-earliestdate <- "2012-03-31"
-latestdate <- "2024-03-31"
+earliestdate <- "2012-06-30"
+latestdate <- "2024-06-30"
 
-smalltbl_earliestdate <- "2021-03-31"
-smalltbl_latestdate <- "2024-03-31"
+smalltbl_earliestdate <- "2021-06-30"
+smalltbl_latestdate <- "2024-06-30"
 
 term <- 360                     # 30 year mortgage
 downpayment <- 0.20             # JCHS report used 3.5% but I will use 20% given our market conditions
