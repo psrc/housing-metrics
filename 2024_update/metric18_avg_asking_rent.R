@@ -19,9 +19,9 @@ hct_data_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric18_
 county_data_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric18_avg_asking_rent/raw_county"
 reference_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric18_avg_asking_rent/reference_table.xlsx"
 export_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric18_avg_asking_rent"
-rgc_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 7/12/2024. Includes all 1-bedroom unit data inside RGC (excludes Federal Way, Issaquah due to missing data). Rent rounded to nearest 10. Inflation adjusted to 2024 dollars.")
-hct_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 7/12/2024. Includes all 1-bedroom unit data inside HCT (excludes Port Orchard Ferry Terminal, Poulsbo, Mukilteo due to missing data). Rent rounded to nearest 10. Inflation adjusted to 2024 dollars.")
-county_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 7/12/2024. Includes all 1-bedroom unit data inside county. Rent rounded to nearest 10. Inflation adjusted to 2024 dollars.")
+rgc_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 8/05/2024. Includes all 1-bedroom unit data inside RGC (excludes Federal Way, Issaquah due to missing data). Rent rounded to nearest 10.")
+hct_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 8/05/2024. Includes all 1-bedroom unit data inside HCT (excludes Port Orchard Ferry Terminal, Poulsbo, Mukilteo due to missing data). Rent rounded to nearest 10.")
+county_source_info <- c("CoStar, Q2 2024 QTD. Calculated by Eric Clute, 8/05/2024. Includes all 1-bedroom unit data inside county. Rent rounded to nearest 10.")
 
 latestdate <- "2024 Q2 QTD"
 earliestdate <- "2019 Q2"
@@ -112,15 +112,12 @@ combined_data$`Asking Rent Per Unit` <- round(combined_data$`Asking Rent Per Uni
 removed <- subset(combined_data, `Inventory Units` < 50)
 combined_data <- subset(combined_data, `Inventory Units` >= 50)
 
-# Pivot & calculate change over time (adjust for inflation)
+# Pivot & calculate change over time
 combined_data_piv <- combined_data %>% pivot_wider(id_cols = 'name', names_from = 'Period', values_from = c('Inventory Units', 'Asking Rent Per Unit'))
-
-combined_data_piv$inflation_adjustment <- pce_deflator(reported_year_to_adjust, inflation_year) # create inflation percentage
 
 ed <- paste0("Asking Rent Per Unit_", earliestdate) # Construct the field name dynamically
 ld <- paste0("Asking Rent Per Unit_", latestdate) # Construct the field name dynamically
 
-combined_data_piv[[ed]] <- combined_data_piv[[ed]] * combined_data_piv$inflation_adjustment
 combined_data_piv$prct_change_rent <- (combined_data_piv[[ld]] - combined_data_piv[[ed]]) / combined_data_piv[[ed]]
 
 # Combine w/reference table
