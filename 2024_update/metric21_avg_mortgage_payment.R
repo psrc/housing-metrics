@@ -14,6 +14,9 @@ library(magrittr)
 library(ggplot2)
 
 # assumptions
+export_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric21_avg_mortgage_payment"
+source_info <- c("Source: Zillow, Home Value Index; Freddie Mac, Primary Mortgage Market Survey; calculated by PSRC.")
+
 metro_area <- "Seattle, WA"
 
 earliestdate <- "2012-06-30"
@@ -147,3 +150,14 @@ mortgage_vs_rent_plot
 #   scale_y_continuous(limits = c(0,200000),labels=function(x) format(x, big.mark = ",", scientific = FALSE)) +
 #   theme(text = element_text(size = 20)) 
 # reqincome_plot
+
+# Export
+export_file <- paste0(export_path, "/metric21_raw.xlsx")
+work_book <- createWorkbook()
+
+# Add the "by_rgc" sheet
+addWorksheet(work_book, sheetName = "analysis")
+writeData(work_book, sheet = "analysis", analysis)
+writeData(work_book, sheet = "analysis", x = data.frame(source_info), startRow = nrow(analysis) + 3, startCol = 1)
+
+saveWorkbook(work_book, file = export_file, overwrite = TRUE)
