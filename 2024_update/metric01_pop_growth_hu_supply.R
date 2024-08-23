@@ -4,25 +4,27 @@
 # Created By: Eric Clute
 
 # Assumptions ---------------------
+devtools::install_github("psrc/psrchousing")
+
 library(dplyr)
 library(openxlsx)
+library(tidyverse)
+library(psrchousing)
 
-hu_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric01_pop_growth_hu_supply/ofm_housing.csv"
-pop_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric01_pop_growth_hu_supply/ofm_population.csv"
 export_path <- "J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric01_pop_growth_hu_supply"
 source_info <- c("OFM April 1 Population and Housing Estimates. Data representing 1980, 1990, 2000, 2010, 2020, 2024. Calculated by Eric Clute.")
 
 years <- c(1980, 1990, 2000, 2010, 2020, 2024)
 
 # Import ---------------------
-hu_raw <- read.csv(hu_path)
-pop_raw <- read.csv(pop_path)
+hu_raw <- ofm_county_housing_unit_data()
+pop_raw <- ofm_county_population_data()
 
 # Clean up data, join ---------------------
 hu <- hu_raw %>% filter(geography == "Region") %>% select(year, total) %>% rename(units = total)
-pop <- pop_raw %>% filter(geography == "Region") %>% select(year, population)
+pop <- pop_raw %>% filter(geography == "Region") %>% ungroup() %>% select(year, population)
 
-analysis <- full_join(hu,pop, by = "year")
+analysis <- left_join(hu,pop, by = "year")
 
 # Calculate change in pop, hu, and ratio ---------------------
 analysis <- analysis %>%
