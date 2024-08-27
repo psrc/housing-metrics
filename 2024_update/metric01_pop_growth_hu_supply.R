@@ -4,8 +4,6 @@
 # Created By: Eric Clute
 
 # Assumptions ---------------------
-devtools::install_github("psrc/psrchousing")
-
 library(dplyr)
 library(openxlsx)
 library(tidyverse)
