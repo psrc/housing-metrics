@@ -1,7 +1,7 @@
 # TITLE: Home Value & Rent 
 # GEOGRAPHIES: Seattle MSA
 # DATA SOURCE: Zillow, ACS
-# DATE MODIFIED: 8.26.2024
+# DATE MODIFIED: 8.27.2024
 # AUTHOR: Eric Clute
 
 library(openxlsx)
@@ -32,11 +32,11 @@ counties <- c("King", "Pierce", "Snohomish")
 # ---------------- Functions ------------------
 pull_data <- function(years){
   # returns a list of get_psrc_pums outputs, one for each year
-  lapply(years, function(x) get_psrc_pums(1, x, "h",c("HINCP")))
+  lapply(years, function(x) get_psrc_pums(1, x, "h",c("HINCP","TEN")))
  }
 
-inc_clean_func <- function(hh_inc){
-  hh_inc_calc <- psrc_pums_median(hh_inc, "HINCP", group_vars = "MSA", rr=TRUE)
+inc_clean_func_tenure <- function(hh_inc){
+  hh_inc_calc <- psrc_pums_median(hh_inc, "HINCP", group_vars = c("MSA", "tenure"), rr=TRUE)
 }
 
 # Function to get columns that start with a number
@@ -45,40 +45,26 @@ get_numeric_cols <- function(df) {
 }
 
 # ---------------- ACS HH Income data -----------------
-# I know this is messy code - I couldn't figure out how to have the MSA column be created within the function. Could be cleaned up!
 # pull the data
 hh_inc <- pull_data(years)
 
-hh_inc[[1]][["variables"]] <- hh_inc[[1]][["variables"]] %>%
-  mutate(hh_inc[[1]][["variables"]], MSA=dplyr::case_when(COUNTY=="Kitsap" ~NA_character_, !is.na(COUNTY) ~ "Seattle Tacoma Bellevue MSA"))
+# Apply the mutate operation to add the MSA column to each element in hh_inc
+hh_inc <- map(hh_inc, function(data) {
+  data[["variables"]] <- data[["variables"]] %>%
+    mutate(MSA = case_when(COUNTY == "Kitsap" ~ NA_character_, !is.na(COUNTY) ~ "Seattle Tacoma Bellevue MSA"),
+           tenure = case_when(TEN == "Rented" ~ "renter", !is.na(TEN) ~ "owner"))
+  return(data)
+})
 
-hh_inc[[2]][["variables"]] <- hh_inc[[2]][["variables"]] %>%
-  mutate(hh_inc[[2]][["variables"]], MSA=dplyr::case_when(COUNTY=="Kitsap" ~NA_character_, !is.na(COUNTY) ~ "Seattle Tacoma Bellevue MSA"))
-
-hh_inc[[3]][["variables"]] <- hh_inc[[3]][["variables"]] %>%
-  mutate(hh_inc[[3]][["variables"]], MSA=dplyr::case_when(COUNTY=="Kitsap" ~NA_character_, !is.na(COUNTY) ~ "Seattle Tacoma Bellevue MSA"))
-
-hh_inc[[4]][["variables"]] <- hh_inc[[4]][["variables"]] %>%
-  mutate(hh_inc[[4]][["variables"]], MSA=dplyr::case_when(COUNTY=="Kitsap" ~NA_character_, !is.na(COUNTY) ~ "Seattle Tacoma Bellevue MSA"))
-
-hh_inc[[5]][["variables"]] <- hh_inc[[5]][["variables"]] %>%
-  mutate(hh_inc[[5]][["variables"]], MSA=dplyr::case_when(COUNTY=="Kitsap" ~NA_character_, !is.na(COUNTY) ~ "Seattle Tacoma Bellevue MSA"))
-
-hh_inc[[6]][["variables"]] <- hh_inc[[6]][["variables"]] %>%
-  mutate(hh_inc[[6]][["variables"]], MSA=dplyr::case_when(COUNTY=="Kitsap" ~NA_character_, !is.na(COUNTY) ~ "Seattle Tacoma Bellevue MSA"))
-
-hh_inc[[7]][["variables"]] <- hh_inc[[7]][["variables"]] %>%
-  mutate(hh_inc[[7]][["variables"]], MSA=dplyr::case_when(COUNTY=="Kitsap" ~NA_character_, !is.na(COUNTY) ~ "Seattle Tacoma Bellevue MSA"))
-
-# Summarize by income
-hh_inc_all <- map(hh_inc, ~inc_clean_func(.x)) %>%
+# Summarize by county and tenure
+hh_inc_tenure <- map(hh_inc, ~inc_clean_func_tenure(.x)) %>%
   reduce(bind_rows) %>%
   filter(MSA == "Seattle Tacoma Bellevue MSA")
 
 # ---------------- OFM Income & Pop Data ----------------
 # Pull data
-download.file(ofm_inc_url, ofm_inc_file, mode = "wb")
-ofm_pop_raw <- ofm_county_population_data()
+download.file(ofm_inc_url, ofm_inc_file, mode = "wb") # download OFM income data
+ofm_pop_raw <- ofm_county_population_data() # pull OFM pop data from elmer
 
 # Clean OFM income data
 ofm_inc_raw <- read_excel(ofm_inc_file, skip = 3, col_names = TRUE, n_max = 41)
@@ -101,7 +87,7 @@ ofm_pop <- ofm_pop_raw %>% filter(geography %in% counties) %>% select(year, geog
 
 # Join together OFM datasets
 ofm_combined <- left_join(ofm_inc, ofm_pop, by = "key")
-ofm_combined <- ofm_combined %>% select (c(County, Year, `Median Income`, population))
+ofm_combined <- ofm_combined %>% select (County, Year, `Median Income`, population)
 
 # Calculate weighted average
 ofm_analysis <- ofm_combined %>%
