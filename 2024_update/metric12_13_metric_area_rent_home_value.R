@@ -1,6 +1,6 @@
 # TITLE: Home Value & Rent 
 # GEOGRAPHIES: Seattle MSA
-# DATA SOURCE: Zillow, ACS
+# DATA SOURCE: Zillow, OFM, 1YR ACS PUMS
 # DATE MODIFIED: 8.27.2024
 # AUTHOR: Eric Clute
 
@@ -93,6 +93,7 @@ ofm_combined <- ofm_combined %>% select (County, Year, `Median Income`, populati
 ofm_analysis <- ofm_combined %>%
   pivot_wider(names_from = County, values_from = c(`Median Income`, population)) %>%
   mutate(population_msa = population_King + population_Pierce + population_Snohomish,
+         
          prct_king = population_King / population_msa,
          prct_pierce = population_Pierce / population_msa,
          prct_snohomish = population_Snohomish / population_msa,
