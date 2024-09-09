@@ -29,7 +29,8 @@ analysis <- analysis %>%
   filter(year %in% years) %>%
   mutate(hu_change = units - lag(units),
          pop_change = population - lag(population),
-         hu_pop_ratio = pop_change / hu_change)
+         hu_pop_ratio = pop_change / hu_change,
+         hu_per_cap_1k = hu_change / population * 1000)
 
 # Cleanup and export ---------------------
 export_file <- paste0(export_path, "/metric01_raw.xlsx")
