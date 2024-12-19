@@ -22,7 +22,8 @@ pums <- pums_raw %>%
       BDSP == "1" ~ "1bed",
       BDSP == "2" ~ "2bed",
       BDSP == "3" ~ "3bed",
-      BDSP %in% c("4", "5", "6", "7") ~ "4bed+",
+      BDSP == "4" ~ "4bed",
+      BDSP %in% c("5", "6", "7") ~ "5bed+",
       TRUE ~ "other")),
     unit_size_rntr = factor(case_when(
       BDSP == "0" ~ "studio",
@@ -34,7 +35,8 @@ pums <- pums_raw %>%
       BDSP %in% c("0", "1") ~ "studio & 1bed",
       BDSP == "2" ~ "2bed",
       BDSP == "3" ~ "3bed",
-      BDSP %in% c("4", "5", "6", "7") ~ "4bed+",
+      BDSP == "4" ~ "4bed",
+      BDSP %in% c("5", "6", "7") ~ "5bed+",
       TRUE ~ "other")),
     decade = factor(case_when(
       YRBLT == "1980 to 1989" ~ "1980s",
