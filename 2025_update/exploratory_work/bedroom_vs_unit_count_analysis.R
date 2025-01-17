@@ -1,7 +1,7 @@
 # TITLE: Counting Bedrooms Created in New Units over time
 # GEOGRAPHIES: PSRC Region & County
 # DATA SOURCE: 1YR ACS PUMS
-# DATE MODIFIED: 12.18.2024
+# DATE MODIFIED: 01.17.2024
 # AUTHOR: Eric Clute
 
 library(psrccensus)
@@ -22,8 +22,7 @@ pums <- pums_raw %>%
       BDSP == "1" ~ "1bed",
       BDSP == "2" ~ "2bed",
       BDSP == "3" ~ "3bed",
-      BDSP == "4" ~ "4bed",
-      BDSP %in% c("5", "6", "7") ~ "5bed+",
+      BDSP %in% c("4", "5", "6", "7") ~ "4bed+",
       TRUE ~ "other")),
     unit_size_rntr = factor(case_when(
       BDSP == "0" ~ "studio",
@@ -35,8 +34,7 @@ pums <- pums_raw %>%
       BDSP %in% c("0", "1") ~ "studio & 1bed",
       BDSP == "2" ~ "2bed",
       BDSP == "3" ~ "3bed",
-      BDSP == "4" ~ "4bed",
-      BDSP %in% c("5", "6", "7") ~ "5bed+",
+      BDSP %in% c("4", "5", "6", "7") ~ "4bed+",
       TRUE ~ "other")),
     decade = factor(case_when(
       YRBLT == "1980 to 1989" ~ "1980s",
@@ -50,30 +48,61 @@ pums <- pums_raw %>%
       TEN == "Owned with mortgage or loan (include home equity loans)" ~ "owner",
       TRUE ~ "renter")))
 
-#-------------- Initial Analyses --------------
-current_yr_built <- psrc_pums_count(pums, group_vars = c("decade"),rr=TRUE)
-current_unit_size <- psrc_pums_count(pums, group_vars = c("unit_size"),rr=TRUE)
-current_tenure <- psrc_pums_count(pums, group_vars = c("tenure"),rr=TRUE)
+#-------------- Regional Analyses --------------
+reg_current_yr_built <- psrc_pums_count(pums, group_vars = c("decade"),rr=TRUE)
+reg_current_unit_size <- psrc_pums_count(pums, group_vars = c("unit_size"),rr=TRUE)
+reg_current_tenure <- psrc_pums_count(pums, group_vars = c("tenure"),rr=TRUE)
 
-#-------------- Analysis - Unit Size by Decade ---------------
-unit_size <- psrc_pums_count(pums, decade, group_vars = c("decade", "unit_size"),rr=TRUE)
+#-------------- Regional Analysis - Unit Size by Decade ---------------
+reg_unit_size <- psrc_pums_count(pums, decade, group_vars = c("decade", "unit_size"),rr=TRUE)
 
-analysis_unit_size <- unit_size %>%
+reg_unit_size_analysis <- reg_unit_size %>%
   filter(unit_size != "Total") %>%
   select(decade, unit_size, share) %>%
   pivot_wider(names_from = decade, values_from = share)
 
-#-------------- Analysis - Unit Size by Decade and Tenure ---------------
-tenure_rntr <- psrc_pums_count(pums, decade, group_vars = c("tenure", "decade", "unit_size_rntr"),rr=TRUE)
+#-------------- Regional Analysis - Unit Size by Decade and Tenure ---------------
+reg_tenure_rntr <- psrc_pums_count(pums, decade, group_vars = c("tenure", "decade", "unit_size_rntr"),rr=TRUE)
 
-analysis_tenure_rntr <- tenure_rntr %>%
+reg_tenure_rntr_analysis <- reg_tenure_rntr %>%
   filter(tenure == "renter", unit_size_rntr != "Total") %>%
   select(decade, unit_size_rntr, share) %>%
   pivot_wider(names_from = decade, values_from = share)
 
-tenure_ownr <- psrc_pums_count(pums, decade, group_vars = c("tenure", "decade", "unit_size_ownr"),rr=TRUE)
+reg_tenure_ownr <- psrc_pums_count(pums, decade, group_vars = c("tenure", "decade", "unit_size_ownr"),rr=TRUE)
 
-analysis_tenure_ownr <- tenure_ownr %>%
+reg_tenure_ownr_analysis <- reg_tenure_ownr %>%
   filter(tenure == "owner", unit_size_ownr != "Total") %>%
   select(decade, unit_size_ownr, share) %>%
   pivot_wider(names_from = decade, values_from = share)
+
+
+#============== Testing Various Geographies ============== 
+
+#-------------- County Analyses --------------
+cnty_current_yr_built <- psrc_pums_count(pums, group_vars = c("COUNTY","decade"),rr=TRUE)
+cnty_current_unit_size <- psrc_pums_count(pums, group_vars = c("COUNTY","unit_size"),rr=TRUE)
+cnty_current_tenure <- psrc_pums_count(pums, group_vars = c("COUNTY","tenure"),rr=TRUE)
+
+#-------------- County Analysis - Unit Size by Decade ---------------
+cnty_unit_size <- psrc_pums_count(pums, decade, group_vars = c("COUNTY","decade", "unit_size"),rr=TRUE)
+
+cnty_unit_size_analysis <- cnty_unit_size %>%
+  filter(unit_size != "Total") %>%
+  select(decade, COUNTY, unit_size, share) %>%
+  pivot_wider(names_from = c(decade,COUNTY), values_from = share)
+
+#-------------- County Analysis - Unit Size by Decade and Tenure ---------------
+cnty_tenure_rntr <- psrc_pums_count(pums, decade, group_vars = c("COUNTY" ,"tenure", "decade", "unit_size_rntr"),rr=TRUE)
+
+cnty_tenure_rntr_analysis <- cnty_tenure_rntr %>%
+  filter(tenure == "renter", unit_size_rntr != "Total") %>%
+  select(decade, COUNTY, unit_size_rntr, share) %>%
+  pivot_wider(names_from = c(decade,COUNTY), values_from = share)
+
+cnty_tenure_ownr <- psrc_pums_count(pums, decade, group_vars = c("COUNTY","tenure", "decade", "unit_size_ownr"),rr=TRUE)
+
+cnty_tenure_ownr_analysis <- cnty_tenure_ownr %>%
+  filter(tenure == "owner", unit_size_ownr != "Total") %>%
+  select(decade,COUNTY, unit_size_ownr, share) %>%
+  pivot_wider(names_from = c(decade,COUNTY), values_from = share)
