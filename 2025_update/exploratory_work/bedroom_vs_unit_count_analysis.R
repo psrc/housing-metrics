@@ -1,7 +1,7 @@
 # TITLE: Counting Bedrooms Created in New Units over time
 # GEOGRAPHIES: PSRC Region & County
 # DATA SOURCE: 1YR ACS PUMS
-# DATE MODIFIED: 01.17.2024
+# DATE MODIFIED: 01.22.2024
 # AUTHOR: Eric Clute
 
 library(psrccensus)
@@ -11,9 +11,11 @@ library(tidyr)
 
 # Assumptions
 year <- c(2022)
+seattle_pumas <- c(23318, 23316, 23317, 23315, 23314, 23312, 23313) #2020 decennial boundaries
+#PUMAs found here: https://psrc-psregcncl.hub.arcgis.com/datasets/5ad2945593df403eadbb6f6756ebb49c_0/explore?location=47.603732%2C-122.364195%2C10.92
 
 #-------------- Pull Data --------------
-pums_raw <- get_psrc_pums(5, year, "h", c("BDSP", "YRBLT", "TEN"))
+pums_raw <- get_psrc_pums(5, year, "h", c("BDSP", "YRBLT", "TEN", "PUMA"))
 
 pums <- pums_raw %>% 
   mutate(
@@ -46,7 +48,14 @@ pums <- pums_raw %>%
     tenure=factor(case_when(
       TEN == "Owned free and clear" ~ "owner",
       TEN == "Owned with mortgage or loan (include home equity loans)" ~ "owner",
-      TRUE ~ "renter")))
+      TRUE ~ "renter")),
+    kc_binary=factor(case_when(
+      COUNTY == "King" ~ "King",
+      TRUE ~ "Outside King")),
+    sea_binary=factor(case_when(
+      PUMA %in% seattle_pumas ~ "seattle",
+      TRUE ~ "outside seattle"))
+    )
 
 #-------------- Regional Analyses --------------
 reg_current_yr_built <- psrc_pums_count(pums, group_vars = c("decade"),rr=TRUE)
@@ -62,20 +71,29 @@ reg_unit_size_analysis <- reg_unit_size %>%
   pivot_wider(names_from = decade, values_from = share)
 
 #-------------- Regional Analysis - Unit Size by Decade and Tenure ---------------
-reg_tenure_rntr <- psrc_pums_count(pums, decade, group_vars = c("tenure", "decade", "unit_size_rntr"),rr=TRUE)
+reg_rntr <- psrc_pums_count(pums, decade, group_vars = c("tenure", "decade", "unit_size_rntr"),rr=TRUE)
 
-reg_tenure_rntr_analysis <- reg_tenure_rntr %>%
+reg_rntr_analysis_share <- reg_rntr %>%
   filter(tenure == "renter", unit_size_rntr != "Total") %>%
   select(decade, unit_size_rntr, share) %>%
   pivot_wider(names_from = decade, values_from = share)
 
-reg_tenure_ownr <- psrc_pums_count(pums, decade, group_vars = c("tenure", "decade", "unit_size_ownr"),rr=TRUE)
+reg_rntr_analysis_count <- reg_rntr %>%
+  filter(tenure == "renter", unit_size_rntr != "Total") %>%
+  select(decade, unit_size_rntr, count) %>%
+  pivot_wider(names_from = decade, values_from = count)
 
-reg_tenure_ownr_analysis <- reg_tenure_ownr %>%
+reg_ownr <- psrc_pums_count(pums, decade, group_vars = c("tenure", "decade", "unit_size_ownr"),rr=TRUE)
+
+reg_ownr_analysis_share <- reg_ownr %>%
   filter(tenure == "owner", unit_size_ownr != "Total") %>%
   select(decade, unit_size_ownr, share) %>%
   pivot_wider(names_from = decade, values_from = share)
 
+reg_ownr_analysis_count <- reg_ownr %>% 
+  filter(tenure == "owner", unit_size_ownr != "Total") %>%
+  select(decade, unit_size_ownr, count) %>%
+  pivot_wider(names_from = decade, values_from = count)
 
 #============== Testing Various Geographies ============== 
 
@@ -106,3 +124,63 @@ cnty_tenure_ownr_analysis <- cnty_tenure_ownr %>%
   filter(tenure == "owner", unit_size_ownr != "Total") %>%
   select(decade,COUNTY, unit_size_ownr, share) %>%
   pivot_wider(names_from = c(decade,COUNTY), values_from = share)
+
+#============== 
+
+#-------------- King County vs Outside King County Analyses --------------
+kc_current_yr_built <- psrc_pums_count(pums, group_vars = c("kc_binary","decade"),rr=TRUE)
+kc_current_unit_size <- psrc_pums_count(pums, group_vars = c("kc_binary","unit_size"),rr=TRUE)
+kc_current_tenure <- psrc_pums_count(pums, group_vars = c("kc_binary","tenure"),rr=TRUE)
+
+#-------------- KC vs Outside KC Analyses - Unit Size by Decade ---------------
+kc_unit_size <- psrc_pums_count(pums, decade, group_vars = c("kc_binary","decade", "unit_size"),rr=TRUE)
+
+kc_unit_size_analysis <- kc_unit_size %>%
+  filter(unit_size != "Total") %>%
+  select(decade, kc_binary, unit_size, share) %>%
+  pivot_wider(names_from = c(decade,kc_binary), values_from = share)
+
+#-------------- KC vs Outside KC Analyses - Unit Size by Decade and Tenure ---------------
+kc_tenure_rntr <- psrc_pums_count(pums, decade, group_vars = c("kc_binary" ,"tenure", "decade", "unit_size_rntr"),rr=TRUE)
+
+kc_tenure_rntr_analysis <- kc_tenure_rntr %>%
+  filter(tenure == "renter", unit_size_rntr != "Total") %>%
+  select(decade, kc_binary, unit_size_rntr, share) %>%
+  pivot_wider(names_from = c(decade,kc_binary), values_from = share)
+
+kc_tenure_ownr <- psrc_pums_count(pums, decade, group_vars = c("kc_binary","tenure", "decade", "unit_size_ownr"),rr=TRUE)
+
+kc_tenure_ownr_analysis <- kc_tenure_ownr %>%
+  filter(tenure == "owner", unit_size_ownr != "Total") %>%
+  select(decade,kc_binary, unit_size_ownr, share) %>%
+  pivot_wider(names_from = c(decade,kc_binary), values_from = share)
+
+#============== 
+
+#-------------- Seattle vs Outside Seattle Analyses --------------
+sea_current_yr_built <- psrc_pums_count(pums, group_vars = c("sea_binary","decade"),rr=TRUE)
+sea_current_unit_size <- psrc_pums_count(pums, group_vars = c("sea_binary","unit_size"),rr=TRUE)
+sea_current_tenure <- psrc_pums_count(pums, group_vars = c("sea_binary","tenure"),rr=TRUE)
+
+#-------------- Sea vs Outside Sea Analyses - Unit Size by Decade ---------------
+sea_unit_size <- psrc_pums_count(pums, decade, group_vars = c("sea_binary","decade", "unit_size"),rr=TRUE)
+
+sea_unit_size_analysis <- sea_unit_size %>%
+  filter(unit_size != "Total") %>%
+  select(decade, sea_binary, unit_size, share) %>%
+  pivot_wider(names_from = c(decade,sea_binary), values_from = share)
+
+#-------------- Sea vs Outside Sea Analyses - Unit Size by Decade and Tenure ---------------
+sea_tenure_rntr <- psrc_pums_count(pums, decade, group_vars = c("sea_binary" ,"tenure", "decade", "unit_size_rntr"),rr=TRUE)
+
+sea_tenure_rntr_analysis <- sea_tenure_rntr %>%
+  filter(tenure == "renter", unit_size_rntr != "Total") %>%
+  select(decade, sea_binary, unit_size_rntr, share) %>%
+  pivot_wider(names_from = c(decade,sea_binary), values_from = share)
+
+sea_tenure_ownr <- psrc_pums_count(pums, decade, group_vars = c("sea_binary","tenure", "decade", "unit_size_ownr"),rr=TRUE)
+
+sea_tenure_ownr_analysis <- sea_tenure_ownr %>%
+  filter(tenure == "owner", unit_size_ownr != "Total") %>%
+  select(decade,sea_binary, unit_size_ownr, share) %>%
+  pivot_wider(names_from = c(decade,sea_binary), values_from = share)
