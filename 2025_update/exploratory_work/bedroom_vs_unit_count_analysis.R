@@ -1,7 +1,7 @@
 # TITLE: Counting Bedrooms Created in New Units over time
 # GEOGRAPHIES: PSRC Region & County
 # DATA SOURCE: 1YR ACS PUMS
-# DATE MODIFIED: 01.24.2024
+# DATE MODIFIED: 01.28.2024
 # AUTHOR: Eric Clute
 
 library(psrccensus)
@@ -11,13 +11,13 @@ library(tidyr)
 library(openxlsx)
 
 # Assumptions
-year <- c(2022)
+year <- c(2023)
 unit_size_order <- c("studio","studio & 1bed", "1bed", "2bed", "3bed", "3bed+", "4bed+")
 seattle_pumas <- c(23318, 23316, 23317, 23315, 23314, 23312, 23313) #2020 decennial boundaries
 #PUMAs found here: https://psrc-psregcncl.hub.arcgis.com/datasets/5ad2945593df403eadbb6f6756ebb49c_0/explore?location=47.603732%2C-122.364195%2C10.92
 
 export_path <- "J:/Projects/V2050/Housing/Monitoring/2025Update/Early Exploratory Work"
-source_info <- c("2022 American Community Survey (ACS) PUMS, 5-Year. Crunched by Eric Clute.")
+source_info <- c("2023 American Community Survey (ACS) PUMS, 5-Year. Crunched by Eric Clute.")
 
 #-------------- Pull Data --------------
 pums_raw <- get_psrc_pums(5, year, "h", c("BDSP", "YRBLT", "TEN", "PUMA"))
