@@ -1,0 +1,203 @@
+---
+title: "Opportunity Index by Race/Ethnicity"
+subtitle: "Data sources: ACS, 5-year 2019-2023"
+author: "Meg Grzybowski, updated by David Dixon (2025)"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_depth: 6
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo=FALSE, 
+                      warning=FALSE, 
+                      message=FALSE)
+```
+
+```{r, packages}
+
+library(DBI)
+library(odbc)
+library(magrittr)
+library(data.table)
+library(httr)
+library(jsonlite)
+library(dplyr)
+library(openxlsx)
+
+library(psrccensus)
+library(psrcplot)
+
+library(tidyverse)
+library(tidycensus)
+library(fastmap)
+
+install_psrc_fonts()
+```
+
+# getting census population data by tract -- mary/eric
+# https://github.com/psrc/housing-metrics/blob/main/process/ACS/AccessToAffordableRentals_RE.R
+```{r, pull ACS data}
+
+tracts_23 <- get_acs_recs(geography ='tract', 
+                             table.names = 'B03002', 
+                             years = 2023, 
+                             counties = c("King", "Kitsap", "Pierce", "Snohomish"),
+                             acs.type = 'acs5')
+
+# refine table
+acs_re_23 <- tracts_23 %>%
+  filter(variable %in% c("B03002_001", "B03002_003", "B03002_004", "B03002_005", "B03002_006", "B03002_007", "B03002_008", "B03002_009",
+                       "B03002_010", "B03002_011", "B03002_012")) %>%
+  dplyr::mutate(.keep = "none",
+         geoid20 = GEOID,
+         count = estimate,
+         count_moe = moe, 
+         race_ethnicity = label,
+         census_tract = name,
+         survey = year)
+
+# create/modify variables
+# str detect will go in order
+acs_re_new <- acs_re_23 %>% 
+  dplyr:: mutate(race_ethnicity = case_when(str_detect(race_ethnicity, "American Indian") ~"AIAN",
+                                    str_detect(race_ethnicity, "Asian") ~"Asian",
+                                    str_detect(race_ethnicity, "Black") ~"Black/African American",
+                                    str_detect(race_ethnicity, "Native Hawaiian") ~"NHOPI",
+                                    str_detect(race_ethnicity, "Some other") ~"Other or Multiple Races",
+                                    str_detect(race_ethnicity, "Two or more") ~"Other or Multiple Races",
+                                    str_detect(race_ethnicity, "White") ~"White",
+                                    str_detect(race_ethnicity, "Hispanic or Latino") ~"Hispanic/Latinx",
+                                    str_detect(race_ethnicity, "Total") ~"Total")) %>%
+  dplyr::group_by(geoid20, census_tract, race_ethnicity) %>%
+  dplyr::summarise(count = sum(count, na.rm = TRUE),
+            moe = moe_sum(count_moe, estimate = count, na.rm = TRUE))%>%
+  dplyr::filter(race_ethnicity != "Total")
+
+```
+
+# Opportunity Index data set
+```{r, opportunity index}
+
+# connect to Elmer
+elmer_connection <- dbConnect(odbc::odbc(),
+  driver = "SQL Server",
+  server = "SQLserver",
+  database = "Elmer",
+  trusted_connection = "yes"
+  )
+
+devtools::install_github("psrc/psrcelmer")
+library(psrcelmer)
+opportunity_layer <- st_read_elmergeo('equity_tracts')
+
+# crosswalk the Opportunity Index data with the ACS r/e data with 10_20 crosswalk
+# crosswalk between census tracts 2010-2020 because data from WTN is using 2010 census geographies while the spatial data (with population estimates) are using 2020 geographies
+crosswalk_10_20 <- dbReadTable(elmer_connection, SQL("census.v_geo_relationships_tracts"))
+
+# join base 2010 data
+opportunity_crosswalk <- merge(crosswalk_10_20, opportunity_layer,
+                               by.x="geoid10",
+                               by.y="geoid10", 
+                               all.x=TRUE)
+
+# join base 2020 data
+opportunity_acs_23 <- merge(acs_re_new, opportunity_crosswalk,
+                             by.x="geoid20",
+                             by.y="geoid20", 
+                             all.x=TRUE) %>%
+  mutate(county2 = case_when(cnty == 33 ~ "King", 
+                             cnty == 35 ~ "Kitsap", 
+                             cnty == 53 ~ "Pierce", 
+                             cnty == 61 ~ "Snohomish"))%>%
+  filter(opp_index %in% c("Very High", "High", "Moderate", "Low", "Very Low")) 
+                       
+opportunity_acs_23$race_ethnicity <- factor(opportunity_acs_23$race_ethnicity,
+                                            levels = c("AIAN",
+                                                       "Asian",
+                                                       "Black/African American",
+                                                       "Hispanic/Latinx",
+                                                       "NHOPI",
+                                                       "Other or Multiple Races",
+                                                       "White"))
+
+
+opportunity_acs_23_new <- subset(opportunity_acs_23, select = c("geoid20", "census_tract", "geoid10", "race_ethnicity", "cnty", "county2", 
+                                                                "count", "moe", "opp_class", "opp_index"))
+
+```
+
+```{r, plot numbers with MOE}
+
+# 1. create a subset table that calculates: the total count of each race/ethnicity for the region
+acs_race_totals <- opportunity_acs_23_new %>%
+  group_by(race_ethnicity)%>%
+  summarise(count=sum(count),
+            count_moe=(moe_sum(moe, count))) %>%
+  mutate(race_ethnicity = case_when(str_detect(race_ethnicity, "AIAN") ~ "AIAN Total",
+                                    str_detect(race_ethnicity, "Asian") ~"Asian Total",
+                                    str_detect(race_ethnicity, "Black/African American") ~"Black/African American Total",
+                                    str_detect(race_ethnicity, "Hispanic/Latinx") ~"Hispanic/Latinx Total",
+                                    str_detect(race_ethnicity, "NHOPI") ~"NHOPI Total",
+                                    str_detect(race_ethnicity, "Other or Multiple Races") ~"Other or Multiple Races Total",
+                                    str_detect(race_ethnicity, "White") ~"White Total")) #%>%
+ # filter(race_ethnicity !="White Total")
+
+# 2a. create a table with the race/ethnicity for each opportunity index rating
+acs_race_opp <- opportunity_acs_23_new %>%
+  group_by(race_ethnicity, opp_index)%>%
+  summarise(count=sum(count),
+            count_moe=(moe_sum(moe, count)))
+
+# 2b. only select the Low and Very Low indices
+acs_low_verylow <- subset(acs_race_opp, opp_index == "Low" | opp_index == "Very Low")
+
+# 2c. combine the totals for the region and table 2b. so that you can calculate the MOE for each race/ethnicity
+## NOTE: when pulling in new data, you will need to change the numbers to reflect new table 1. values ##
+acs_comb_low_verylow <- acs_low_verylow %>%
+  add_column(total_region_count_RE = rep(c(23195, 617142, 236741, 468635, 35700, 638985, 2475132), each = 2), 
+             .after = 'count_moe')
+
+# 3. calculate share and share_moe
+acs_comb_low_verylow$share <- acs_comb_low_verylow$count/acs_comb_low_verylow$total_region_count_RE
+
+acs_comb_low_verylow$share_moe <- acs_comb_low_verylow$count_moe/acs_comb_low_verylow$total_region_count_RE
+  
+```
+
+```{r, opportunity index chart with moe}
+
+opp_index_column <- static_column_chart(t= acs_comb_low_verylow,
+                                        x = "race_ethnicity", y = "share",
+                                        fill = "opp_index",
+                                        pos = "stack",
+                                        #moe = "share_moe",    #including moe will remove bar labels, one or the other
+                                        title = "Opportunity Index",
+                                        color = "psrc_pairs") 
+
+opp_index_column # stacked with labels
+
+opp_index_column_moe <- static_column_chart(t= acs_comb_low_verylow,
+                                        x = "race_ethnicity", y = "share",
+                                        fill = "opp_index",
+                                        pos = "dodge",
+                                        moe = "share_moe",    #including moe will remove bar labels, one or the other
+                                        #dec = 1, 
+                                        title = "Opportunity Index",
+                                        color = "psrc_pairs") 
+
+opp_index_column_moe
+```
+
+# write to Excel
+```{r, write to excel, eval = FALSE}
+# can change the output path when updating yearly information
+
+setwd("J:/Projects/V2050/Housing/Monitoring/2025Update/data/metric06_opportunity_RE")
+
+write.csv(opportunity_acs_23_new, "/r_output 2023 5YR_trial.csv", row.names=FALSE)
+```
