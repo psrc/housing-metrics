@@ -9,10 +9,8 @@ library(tidyr)
 library(tidyverse)
 library(readr)
 
-save_path <- "J:/Projects/V2050/Housing/Monitoring/2025Update/data/metric16_17_affordability_indexes/metric16_17_raw.csv"
-
-mb_hai_link <- "https://public.tableau.com/app/profile/mason.virant/viz/County_DB_HAIMedianBuyer_Q4_2024/DB-HAIMedianBuyer?County=King,Kitsap,Pierce,Snohomish"
-ftb_hai_link <- "https://public.tableau.com/app/profile/mason.virant/viz/County_DB_HAIFirstTimeBuyer_Q4_2024/DB-HAIFirstTimeBuyer?County=King,Kitsap,Pierce,Snohomish"
+mb_hai_link <- "https://public.tableau.com/app/profile/mason.virant/viz/County_DB_HAIMedianBuyer_Q1_2025/DB-HAIMedianBuyer?County=King,Kitsap,Pierce,Snohomish"
+ftb_hai_link <- "https://public.tableau.com/app/profile/mason.virant/viz/County_DB_HAIFirstTimeBuyer_Q1_2025/DB-HAIFirstTimeBuyer?County=King,Kitsap,Pierce,Snohomish"
 
 # --------------- Download Data ---------------
 mb_hai_raw <- read_csv(mb_hai_link)
@@ -50,11 +48,11 @@ ftb_hai <- ftb_hai_raw %>% select(all_of(c(select_county,select_q1)))
 ftb_hai <- ftb_hai[ftb_hai$County %in% c("King", "Kitsap", "Pierce", "Snohomish"),]
 
 # --------------- Export to Excel ---------------
-setwd("J:/Projects/V2050/Housing/Monitoring/2023Update")
+setwd("J:/Projects/V2050/Housing/Monitoring/2025Update/data/metric16_17_affordability_indexes")
 
 work_book <- createWorkbook()
 addWorksheet(work_book, sheetName = "first_time_buyer_hai")
 writeData(work_book, "first_time_buyer_hai", ftb_hai)
 addWorksheet(work_book, sheetName = "median_buyer_hai")
 writeData(work_book, "median_buyer_hai", mb_hai)
-saveWorkbook(work_book, file = "Affordability Measures/r_output_HAI_Q1.xlsx", overwrite = TRUE)
+saveWorkbook(work_book, file = "r_output_HAI_Q1.xlsx", overwrite = TRUE)
