@@ -1,0 +1,889 @@
+# TITLE: Ownership Opportunities in Centers and Near HCT
+# GEOGRAPHIES: PSRC Region and Counties
+# DATA SOURCE: ACS
+# DATE: 3.26.2025
+# AUTHOR: Kristin Mitchell
+
+
+library(psrccensus)
+library(psrcelmer)
+library(psrcplot)
+library(tidyverse)
+library(stringr)
+library(dplyr)
+library(magrittr)
+
+# Inputs ------------------------------------------------------------------
+years <- c(2013,2018,2023)
+county_order <- c("King County","Kitsap County", "Pierce County", "Snohomish County", "Region Total")
+value_order <- c("Total", "Less than $300,000","$300,000 to $499,999","$500,000 to $749,999","$750,000 to $999,999","$1,000,000 to $1,499,999", 
+                 "$1,500,000 to $1,999,999", "$2,000,000 or more")
+value_order_old <- c("Total", "Less than $300,000","$300,000 to $499,999","$500,000 to $749,999","$750,000 to $999,999","$1,000,000 or more")
+bedrooms_order <- c("No bedroom", "1 bedroom", "2 bedrooms", "3 bedrooms", "4 bedrooms", "5+ bedrooms", "Total")
+
+# Blockgroup Splits from Elmer --------------------------------------------
+hct_blockgroup <- NULL
+
+q10 <- paste0("SELECT * FROM general.get_geography_splits('blockgroup10', 'HCT Station Areas (Vision 2050) and RGCs', 2010, 2020, 2014)")
+q13 <- paste0("SELECT * FROM general.get_geography_splits('blockgroup10', 'HCT Station Areas (Vision 2050) and RGCs', 2013, 2020, 2014)")
+q18 <- paste0("SELECT * FROM general.get_geography_splits('blockgroup10', 'HCT Station Areas (Vision 2050) and RGCs', 2018, 2020, 2018)")
+#q21 <- paste0("SELECT * FROM general.get_geography_splits('blockgroup20', 'HCT Station Areas (Vision 2050) and RGCs', 2021, 2022, 2018)")
+q23 <- paste0("SELECT * FROM general.get_geography_splits('blockgroup20', 'HCT Station Areas (Vision 2050) and RGCs', 2023, 2023, 2018)")
+
+s10 <- get_query(sql = q10, db_name = "Elmer")
+s13 <- get_query(sql = q13, db_name = "Elmer")
+s18 <- get_query(sql = q18, db_name = "Elmer")
+#s21 <- get_query(sql = q21, db_name = "Elmer")
+s23 <- get_query(sql = q23, db_name = "Elmer")
+
+hct_blockgroup <- bind_rows(s10, s13, s18, s23)
+rm(q10, q13, q18, q23, s10, s13, s18, s23)
+
+# Housing Tenure ----------------------------------------------------------
+
+# Download ACS data and clean
+tenure <- get_acs_recs(geography = 'block group', table.names = c('B25003'), years = years)
+
+tenure <- tenure %>%
+  dplyr::select(geoid="GEOID", geography="census_geography", "estimate", "moe", "variable", "year") %>%
+  mutate(variable = factor(case_when(variable == "B25003_001" ~ "total households",
+                                     variable == "B25003_002" ~ "owner",
+                                     variable == "B25003_003" ~ "renter",
+                                     !is.na(variable) ~"N/A"),
+                           levels=c("total households","owner","renter")))
+
+# Download 2010 ACS data and clean
+tenure10 <- read_csv("J:\\Projects\\V2050\\Housing\\Monitoring\\2024Update\\Data\\metric10_ownership_near_transit\\2010_files\\nhgis0001_csv\\B25003\\Tenure-2010-5yr.csv") %>% 
+  mutate(geoid = str_remove_all(geoid, "15000US")) %>% 
+  dplyr::select("year", "county", "geoid", `estimate-total households`="total households", `estimate-owner`="owner", `estimate-renter`="renter", `moe-total households`="total-moe", `moe-owner`="owner-moe", `moe-renter`="renter-moe") 
+
+tenure10_pivoted <- tenure10 %>% 
+  pivot_longer(cols = !c(year, county, geoid), names_to = c(".value", "variable"), names_sep = "-") %>%
+  mutate(variable = factor(variable, levels=c("total households","owner","renter")))
+
+#Combine 2010 with Other Years
+
+tenure_all <- bind_rows(tenure, tenure10_pivoted) %>% dplyr::select(-"county", -"geography")
+
+# Calculate Estimates using Blockgroup splits from Elmer Parcelization Data 
+in_hct_split <- hct_blockgroup %>%
+  filter(planning_geog=="in station area or rgc") %>%
+  dplyr::select(geoid="data_geog", year="ofm_estimate_year", inside_split="percent_of_occupied_housing_units")
+
+out_hct_split <- hct_blockgroup %>%
+  filter(planning_geog=="not in station area or rgc") %>%
+  dplyr::select(geoid="data_geog", year="ofm_estimate_year", outside_split="percent_of_occupied_housing_units")
+
+tenure_by_hct <- left_join(tenure_all, in_hct_split, by=c("geoid", "year")) %>% 
+  mutate(inside_split=replace_na(inside_split, 0)) %>%
+  mutate(inside_estimate = round(estimate*inside_split,0))
+
+tenure_by_hct <- left_join(tenure_by_hct, out_hct_split, by=c("geoid", "year")) %>% 
+  mutate(outside_split=replace_na(outside_split, 0)) %>%
+  mutate(outside_estimate = round(estimate*outside_split,0))
+
+# Add County Name
+tenure_by_hct <- tenure_by_hct %>%
+  mutate(county=case_when(
+    str_detect(geoid, "53033") ~ "King County",
+    str_detect(geoid, "53035") ~ "Kitsap County",
+    str_detect(geoid, "53053") ~ "Pierce County",
+    str_detect(geoid, "53061") ~ "Snohomish County"))
+
+# Create Clean Blockgroup Data
+tenure_by_hct <- tenure_by_hct %>%
+  dplyr::select("geoid","county","variable","year",`Inside centers and HCT station areas`="inside_estimate",`Outside centers and HCT station areas`="outside_estimate") %>%
+  pivot_longer(!c(geoid,county,variable,year), names_to = "metric", values_to = "estimate")
+
+# Create Summary Chart
+tenure_summary <- tenure_by_hct %>%
+  group_by(county, year, variable, metric) %>%
+  summarise(estimate=sum(estimate)) %>%
+  as_tibble()
+
+region_summary <- tenure_by_hct %>%
+  group_by(year, variable, metric) %>%
+  summarise(estimate=sum(estimate)) %>%
+  as_tibble() %>%
+  mutate(county="Region Total")
+
+tenure_summary <- bind_rows(tenure_summary, region_summary) %>%
+  mutate(county = factor(county, levels=county_order))
+
+totals <- tenure_summary %>% filter(variable=="total households") %>% rename(total=estimate) %>% select(-"variable")
+
+tenure_summary <- left_join(tenure_summary, totals, by=c("county","year", "metric")) %>%
+  mutate(share=estimate/total) %>%
+  select(-"total") 
+
+tenure_chart_2010 <- static_column_chart(t = tenure_summary %>% filter(year==2010 & variable=="owner"),
+                                         x = "county", y="share", fill="metric", color="pognbgy_5",
+                                         title="Ownership Housing in Centers and Near Transit: 2010",
+                                         source="Source: US Census Bureau 2006-2010 American Community Survey 5-year Estimates Table B25003")
+
+tenure_chart_2013 <- static_column_chart(t = tenure_summary %>% filter(year==2013 & variable=="owner"),
+                                         x = "county", y="share", fill="metric", color="pognbgy_5",
+                                         title="Ownership Housing in Centers and Near Transit: 2013",
+                                         source="Source: US Census Bureau 2009-2013 American Community Survey 5-year Estimates Table B25003")
+
+tenure_chart_2018 <- static_column_chart(t = tenure_summary %>% filter(year==2018 & variable=="owner"),
+                                         x = "county", y="share", fill="metric", color="pognbgy_5",
+                                         title="Ownership Housing in Centers and Near Transit: 2018",
+                                         source="Source: US Census Bureau 2014-2018 American Community Survey 5-year Estimates Table B25003")
+
+tenure_chart_2023 <- static_column_chart(t = tenure_summary %>% filter(year==2023 & variable=="owner"),
+                                         x = "county", y="share", fill="metric", color="pognbgy_5",
+                                         title="Ownership Housing in Centers and Near Transit: 2023",
+                                         source="Source: US Census Bureau 2019-2023 American Community Survey 5-year Estimates Table B25003")
+
+psrc_col <- c("#00A7A0", "#8CC63E", "#F05A28", "#91268F", "#BBBDC0", "#76787A",
+              "#00A7A0", "#8CC63E", "#F05A28", "#91268F", "#BBBDC0", "#76787A")
+
+tenure_summary$year<-as.character(tenure_summary$year)
+tenure_summary <- tenure_summary %>%
+  mutate(share_rounded = round(share, digits=2)) 
+
+tenure_chart_years <- tenure_summary %>% filter(variable=="owner") %>%
+  ggplot(aes(x=year, y=share, fill=metric, label=share_rounded)) +
+  geom_col(position="dodge") +
+  scale_fill_manual(values=psrc_col) + 
+  facet_wrap(~county, nrow=1, scales="free", strip.position = "bottom") +
+  ggtitle("Ownership Housing in Centers and Near Transit: 2010, 2013, 2018, 2023") +
+  theme(strip.placement="outside", axis.title.x=element_blank()) + 
+  geom_text(position=position_dodge(0.5), vjust=-0.25) +
+  theme(panel.background = element_blank())
+
+tenure_chart_years
+
+rm(in_hct_split, out_hct_split, tenure, totals, region_summary)
+
+#write_csv(tenure_summary, file = 'J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric10_ownership_near_transit\\ownershipopps24.csv')
+
+# Home Value --------------------------------------------------------------
+
+# Download ACS data and clean - Updated Value Groups - updated value buckets
+value <- get_acs_recs(geography = 'block group', table.names = c('B25075'), years = years)
+
+value <- value %>%
+  dplyr::select(geoid="GEOID", geography="census_geography", "estimate", "moe", "variable", "year") %>%
+  separate(variable, into=c("table","variable"), sep="_", remove=TRUE) %>%
+  mutate(variable = as.integer(variable)) %>%
+  mutate(label = case_when(variable == 1 ~ "Total",
+                           variable <=20 ~ "Less than $300,000",
+                           variable <=22 ~ "$300,000 to $499,999",
+                           variable ==23 ~ "$500,000 to $749,999",
+                           variable ==24 ~ "$750,000 to $999,999",
+                           variable ==25 ~ "$1,000,000 to $1,499,999",
+                           variable ==26 ~ "$1,500,000 to $1,999,999",
+                           variable ==27 ~ "$2,000,000 or more"
+  )) %>%
+  dplyr::select(-"geography",-"table",-"variable", -"moe") %>%
+  group_by(geoid, year, label) %>%
+  summarise(estimate=sum(estimate)) %>%
+  as_tibble() %>%
+  rename(variable="label") %>%
+  mutate(county=case_when(
+    str_detect(geoid, "53033") ~ "King County",
+    str_detect(geoid, "53035") ~ "Kitsap County",
+    str_detect(geoid, "53053") ~ "Pierce County",
+    str_detect(geoid, "53061") ~ "Snohomish County"))
+
+
+## 2010 file is on the J: drive but past years can't be adjusted for inflation due to bucketing
+## didn't run 2010 
+# value2010 <- read_csv("J:\\Projects\\V2050\\Housing\\Monitoring\\2024Update\\Data\\metric10_ownership_near_transit\\2010_files\\nhgis0001_csv\\B25075\\value-2010-5yr.csv") %>%
+#   pivot_longer(cols = !c(YEAR, COUNTY, GEOID), names_to = c(".value", "variable"), names_sep = "-") %>%
+#   mutate(variable = factor(variable))
+# 
+# value2010 <- value2010 %>%
+#   dplyr::select(geoid="GEOID", "estimate", "moe", "variable", "year") %>%
+#   separate(variable, into=c("table","variable"), sep="_", remove=TRUE) %>%
+#   mutate(variable = as.integer(variable)) %>%
+#   mutate(label = case_when(variable == 1 ~ "Total",
+#                            variable <=14 ~ "Less than $100,000",
+#                            variable <=18 ~ "$100,000 to $199,999",
+#                            variable <=20 ~ "$200,000 to $299,999",
+#                            variable ==21 ~ "$300,000 to $399,999",
+#                            variable ==22 ~ "$400,000 to $499,999",
+#                            variable ==23 ~ "$500,000 to $749,999",
+#                            variable ==24 ~ "$750,000 to $999,999",
+#                            variable ==25 ~ "$1,000,000 to $1,499,999",
+#                            variable ==26 ~ "$1,500,000 to $1,999,999",
+#                            variable ==27 ~ "$2,000,000 or more")) %>%
+#   dplyr::select(-"geography",-"table",-"variable", -"moe") %>%
+#   group_by(geoid, year, label) %>%
+#   summarise(estimate=sum(estimate)) %>%
+#   as_tibble() %>%
+#   rename(variable="label") %>%
+#   mutate(county=case_when(
+#     str_detect(geoid, "53033") ~ "King County",
+#     str_detect(geoid, "53035") ~ "Kitsap County",
+#     str_detect(geoid, "53053") ~ "Pierce County",
+#     str_detect(geoid, "53061") ~ "Snohomish County"))
+
+# Calculate Estimates using Blockgroup splits from Elmer Parcelization Data 
+in_hct_split <- hct_blockgroup %>%
+  filter(planning_geog=="in station area or rgc") %>%
+  dplyr::select(geoid="data_geog", year="ofm_estimate_year", inside_split="percent_of_occupied_housing_units")
+
+out_hct_split <- hct_blockgroup %>%
+  filter(planning_geog=="not in station area or rgc") %>%
+  dplyr::select(geoid="data_geog", year="ofm_estimate_year", outside_split="percent_of_occupied_housing_units")
+
+value_by_hct <- left_join(value, in_hct_split, by=c("geoid", "year")) %>% 
+  mutate(inside_split=replace_na(inside_split, 0)) %>%
+  mutate(inside_estimate = round(estimate*inside_split,0))
+
+value_by_hct <- left_join(value_by_hct, out_hct_split, by=c("geoid", "year")) %>% 
+  mutate(outside_split=replace_na(outside_split, 0)) %>%
+  mutate(outside_estimate = round(estimate*outside_split,0))
+
+# Create Clean Blockgroup Data
+value_by_hct <- value_by_hct %>%
+  dplyr::select("geoid","county","variable","year",`Inside centers and HCT station areas`="inside_estimate",`Outside centers and HCT station areas`="outside_estimate") %>%
+  pivot_longer(!c(geoid,county,variable,year), names_to = "metric", values_to = "estimate")
+
+# Create Summary Chart
+value_summary <- value_by_hct %>%
+  group_by(county, year, variable, metric) %>%
+  summarise(estimate=sum(estimate)) %>%
+  as_tibble()
+
+region_summary <- value_by_hct %>%
+  group_by(year, variable, metric) %>%
+  summarise(estimate=sum(estimate)) %>%
+  as_tibble() %>%
+  mutate(county="Region Total")
+
+value_summary <- bind_rows(value_summary, region_summary) %>%
+  mutate(county = factor(county, levels=county_order)) %>%
+  mutate(variable = factor(variable, levels=value_order))
+
+totals <- value_summary %>% filter(variable=="Total") %>% rename(total=estimate) %>%  dplyr::select(-"variable")
+
+value_summary <- left_join(value_summary, totals, by=c("county","year", "metric")) %>%
+  mutate(share=estimate/total) %>%
+  dplyr::select(-"total")
+
+value_chart_2013 <- static_column_chart(t = value_summary %>% filter(year==2013 & variable!="Total" & county=="Region Total"),
+                                        x = "variable", y="share", fill="metric", color="obgnpgy_5",
+                                        title="Home Value in Centers and Near Transit: 2013",
+                                        source="Source: US Census Bureau 2009-2013 American Community Survey 5-year Estimates Table B25075") +
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 0, vjust = 0.5, hjust=0.5)) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) 
+
+value_chart_2018 <- static_column_chart(t = value_summary %>% filter(year==2018 & variable!="Total" & county=="Region Total"),
+                                        x = "variable", y="share", fill="metric", color="obgnpgy_5",
+                                        title="Home Value in Centers and Near Transit: 2018",
+                                        source="Source: US Census Bureau 2014-2018 American Community Survey 5-year Estimates Table B25075") +
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 0, vjust = 0.5, hjust=0.5)) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10))
+
+value_chart_2023 <- static_column_chart(t = value_summary %>% filter(year==2023 & variable!="Total" & county=="Region Total"),
+                                        x = "variable", y="share", fill="metric", color="obgnpgy_5",
+                                        title="Home Value in Centers and Near Transit: 2023",
+                                        source="Source: US Census Bureau 2019-2023 American Community Survey 5-year Estimates Table B25075") +
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 0, vjust = 0.5, hjust=0.5)) + scale_x_discrete(labels = function(x) str_wrap(x, width = 10))
+
+
+rm(in_hct_split, out_hct_split, value, totals, region_summary)
+
+#write_csv(value_summary, file = 'J:/Projects/V2050/Housing/Monitoring/2024Update/Data/metric10_ownership_near_transit\\ownershipvalues2024.csv')
+
+# Download ACS data and clean - Updated Value Groups - old value buckets
+value <- get_acs_recs(geography = 'block group', table.names = c('B25075'), years = years)
+
+value <- value %>%
+  dplyr::select(geoid="GEOID", geography="census_geography", "estimate", "moe", "variable", "year") %>%
+  separate(variable, into=c("table","variable"), sep="_", remove=TRUE) %>%
+  mutate(variable = as.integer(variable)) %>%
+  mutate(label = case_when(variable == 1 ~ "Total",
+                           variable <=20 ~ "Less than $300,000",
+                           variable <=22 ~ "$300,000 to $499,999",
+                           variable ==23 ~ "$500,000 to $749,999",
+                           variable ==24 ~ "$750,000 to $999,999",
+                           variable <=27 ~ "$1,000,000 or more"
+  )) %>%
+  dplyr::select(-"geography",-"table",-"variable", -"moe") %>%
+  group_by(geoid, year, label) %>%
+  summarise(estimate=sum(estimate)) %>%
+  as_tibble() %>%
+  rename(variable="label") %>%
+  mutate(county=case_when(
+    str_detect(geoid, "53033") ~ "King County",
+    str_detect(geoid, "53035") ~ "Kitsap County",
+    str_detect(geoid, "53053") ~ "Pierce County",
+    str_detect(geoid, "53061") ~ "Snohomish County"))
+
+
+# Download ACS data and clean - 2010
+value2010 <- read_csv("J:\\Projects\\V2050\\Housing\\Monitoring\\2024Update\\Data\\metric10_ownership_near_transit\\2010_files\\nhgis0001_csv\\B25075\\value-2010-5yr.csv") %>%
+  pivot_longer(cols = !c(YEAR, COUNTY, GEOID), names_to = c(".value", "variable"), names_sep = "-") %>%
+  mutate(variable = factor(variable))
+
+
+#, levels=c("total households","owner","renter")))
+
+value2010 <- value2010 %>%
+  dplyr::select(geoid="GEOID", "estimate", "moe", "variable", "year") %>%
+  separate(variable, into=c("table","variable"), sep="_", remove=TRUE) %>%
+  mutate(variable = as.integer(variable)) %>%
+  mutate(label = case_when(variable == 1 ~ "Total",
+                           variable <=14 ~ "Less than $100,000",
+                           variable <=18 ~ "$100,000 to $199,999",
+                           variable <=20 ~ "$200,000 to $299,999",
+                           variable ==21 ~ "$300,000 to $399,999",
+                           variable ==22 ~ "$400,000 to $499,999",
+                           variable ==23 ~ "$500,000 to $749,999",
+                           variable ==24 ~ "$750,000 to $999,999",
+                           variable ==25 ~ "$1,000,000 to $1,499,999",
+                           variable ==26 ~ "$1,500,000 to $1,999,999",
+                           variable ==27 ~ "$2,000,000 or more")) %>%
+  dplyr::select(-"geography",-"table",-"variable", -"moe") %>%
+  group_by(geoid, year, label) %>%
+  summarise(estimate=sum(estimate)) %>%
+  as_tibble() %>%
+  rename(variable="label") %>%
+  mutate(county=case_when(
+    str_detect(geoid, "53033") ~ "King County",
+    str_detect(geoid, "53035") ~ "Kitsap County",
+    str_detect(geoid, "53053") ~ "Pierce County",
+    str_detect(geoid, "53061") ~ "Snohomish County"))
+
+# Calculate Estimates using Blockgroup splits from Elmer Parcelization Data 
+in_hct_split <- hct_blockgroup %>%
+  filter(planning_geog=="in station area or rgc") %>%
+  dplyr::select(geoid="data_geog", year="ofm_estimate_year", inside_split="percent_of_occupied_housing_units")
+
+out_hct_split <- hct_blockgroup %>%
+  filter(planning_geog=="not in station area or rgc") %>%
+  dplyr::select(geoid="data_geog", year="ofm_estimate_year", outside_split="percent_of_occupied_housing_units")
+
+value_by_hct <- left_join(value, in_hct_split, by=c("geoid", "year")) %>% 
+  mutate(inside_split=replace_na(inside_split, 0)) %>%
+  mutate(inside_estimate = round(estimate*inside_split,0))
+
+value_by_hct <- left_join(value_by_hct, out_hct_split, by=c("geoid", "year")) %>% 
+  mutate(outside_split=replace_na(outside_split, 0)) %>%
+  mutate(outside_estimate = round(estimate*outside_split,0))
+
+# Create Clean Blockgroup Data
+value_by_hct <- value_by_hct %>%
+  dplyr::select("geoid","county","variable","year",`Inside centers and HCT station areas`="inside_estimate",`Outside centers and HCT station areas`="outside_estimate") %>%
+  pivot_longer(!c(geoid,county,variable,year), names_to = "metric", values_to = "estimate")
+
+# Create Summary Chart
+value_summary <- value_by_hct %>%
+  group_by(county, year, variable, metric) %>%
+  summarise(estimate=sum(estimate)) %>%
+  as_tibble()
+
+region_summary <- value_by_hct %>%
+  group_by(year, variable, metric) %>%
+  summarise(estimate=sum(estimate)) %>%
+  as_tibble() %>%
+  mutate(county="Region Total")
+
+value_summary <- bind_rows(value_summary, region_summary) %>%
+  mutate(county = factor(county, levels=county_order)) %>%
+  mutate(variable = factor(variable, levels=value_order_old))
+
+totals <- value_summary %>% filter(variable=="Total") %>% rename(total=estimate) %>%  dplyr::select(-"variable")
+
+value_summary <- left_join(value_summary, totals, by=c("county","year", "metric")) %>%
+  mutate(share=estimate/total) %>%
+  dplyr::select(-"total")
+
+value_chart_2018_old <- static_column_chart(t = value_summary %>% filter(year==2018 & variable!="Total" & county=="Region Total"),
+                                            x = "variable", y="share", fill="metric", color="obgnpgy_5",
+                                            title="Home Value in Centers and Near Transit: 2018",
+                                            source="Source: US Census Bureau 2014-2018 American Community Survey 5-year Estimates Table B25075") +
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 0, vjust = 0.5, hjust=0.5)) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) 
+
+# value_chart_2021_old <- static_column_chart(t = value_summary %>% filter(year==2021 & variable!="Total" & county=="Region Total"),
+#                                             x = "variable", y="share", fill="metric", color="obgnpgy_5",
+#                                             title="Home Value in Centers and Near Transit: 2021",
+#                                             source="Source: US Census Bureau 2017-2021 American Community Survey 5-year Estimates Table B25075") +
+#   ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 0, vjust = 0.5, hjust=0.5)) +
+#   scale_x_discrete(labels = function(x) str_wrap(x, width = 10))
+
+value_chart_2023_old <- static_column_chart(t = value_summary %>% filter(year==2023 & variable!="Total" & county=="Region Total"),
+                                            x = "variable", y="share", fill="metric", color="obgnpgy_5",
+                                            title="Home Value in Centers and Near Transit: 2023",
+                                            source="Source: US Census Bureau 2019-2023 American Community Survey 5-year Estimates Table B25075") +
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 0, vjust = 0.5, hjust=0.5)) + scale_x_discrete(labels = function(x) str_wrap(x, width = 10))
+
+
+rm(in_hct_split, out_hct_split, value, totals, region_summary)
+
+# Look at region as a whole
+
+region_summary2 <- value %>%
+  group_by(year, variable) %>%
+  summarise(estimate=sum(estimate)) %>%
+  as_tibble() %>%
+  mutate(county="Region Total")
+
+value_summary2 <- region_summary2 %>%
+  mutate(variable = factor(variable, levels=value_order_old))
+
+
+# value_chart_2021_reg <- static_column_chart(t = value_summary2 %>% filter(year==2021 & county=="Region Total"),
+#                                             x = "variable", y="estimate", fill="variable", color="obgnpgy_5",
+#                                             title="Home Values for Region: 2021",
+#                                             source="Source: US Census Bureau 2017-2021 American Community Survey 5-year Estimates Table B25075") +  
+#   ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 0, vjust = 0.5, hjust=0.5)) + scale_x_discrete(labels = function(x) str_wrap(x, width = 10))
+
+
+value_chart_2023_reg <- static_column_chart(t = value_summary2 %>% filter(year==2023 & county=="Region Total"),
+                                            x = "variable", y="estimate", fill="variable", color="obgnpgy_5",
+                                            title="Home Values for Region: 2023",
+                                            source="Source: US Census Bureau 2018-2023 American Community Survey 5-year Estimates Table B25075") +  
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 0, vjust = 0.5, hjust=0.5)) + scale_x_discrete(labels = function(x) str_wrap(x, width = 10))
+
+# Bedroom Count --------------------------------------------------------------
+
+# Download ACS data and clean
+bedrooms <- get_acs_recs(geography = 'block group', table.names = c('B25042'), years = years)
+
+bedrooms <- bedrooms %>%
+  select(geoid="GEOID", geography="census_geography", "estimate", "moe", "variable", "year", "label") %>%
+  filter(grepl('Owner', label)) %>%
+  separate(variable, into=c("table","variable"), sep="_", remove=TRUE) %>%
+  mutate(variable = as.integer(variable)) %>%
+  mutate(label = case_when(variable ==002 ~ "Total",
+                           variable ==003 ~ "No bedroom",
+                           variable ==004 ~ "1 bedroom",
+                           variable ==005 ~ "2 bedrooms",
+                           variable ==006 ~ "3 bedrooms",
+                           variable ==007 ~ "4 bedrooms",
+                           variable ==008 ~ "5+ bedrooms")) %>%
+  select(-"geography",-"table",-"variable") %>%
+  group_by(geoid, year, label) %>%
+  summarise(estimate=sum(estimate)) %>%
+  as_tibble() %>%
+  rename(variable="label") %>%
+  mutate(county=case_when(
+    str_detect(geoid, "53033") ~ "King County",
+    str_detect(geoid, "53035") ~ "Kitsap County",
+    str_detect(geoid, "53053") ~ "Pierce County",
+    str_detect(geoid, "53061") ~ "Snohomish County"))
+
+# Download 2010 ACS data and clean
+bedrooms10 <- read_csv("J:\\Projects\\V2050\\Housing\\Monitoring\\2024Update\\Data\\metric10_ownership_near_transit\\2010_files\\nhgis0001_csv\\B25042\\bedrooms-2010-5yr.csv") %>% 
+  rename(geoid="GEOID") %>%
+  rename(year="YEAR") %>%
+  mutate(geoid = str_remove_all(geoid, "15000US")) %>% 
+  select("year", "geoid", "estimate-002", "estimate-003", "estimate-004", "estimate-005", "estimate-006", "estimate-007", "estimate-008", "moe-002", "moe-003", "moe-004", "moe-005", "moe-006", "moe-007", "moe-008") %>%
+  mutate(county=case_when(
+    str_detect(geoid, "53033") ~ "King County",
+    str_detect(geoid, "53035") ~ "Kitsap County",
+    str_detect(geoid, "53053") ~ "Pierce County",
+    str_detect(geoid, "53061") ~ "Snohomish County"))
+
+bedrooms10_pivoted <- bedrooms10 %>% 
+  pivot_longer(cols = !c(year, county, geoid), names_to = c(".value", "variable"), names_sep = "-") %>%
+  mutate(variable = factor(variable, levels=c("002", "003", "004", "005", "006", "007", "008"))) %>%
+  mutate(variable = case_when(variable =="002" ~ "Total",
+                              variable =="003" ~ "No bedroom",
+                              variable =="004" ~ "1 bedroom",
+                              variable =="005" ~ "2 bedrooms",
+                              variable =="006" ~ "3 bedrooms",
+                              variable =="007" ~ "4 bedrooms",
+                              variable =="008" ~ "5+ bedrooms")) %>%
+  as_tibble() %>%
+  mutate(county=case_when(
+    str_detect(geoid, "53033") ~ "King County",
+    str_detect(geoid, "53035") ~ "Kitsap County",
+    str_detect(geoid, "53053") ~ "Pierce County",
+    str_detect(geoid, "53061") ~ "Snohomish County"))
+
+
+#Combine 2010 with Other Years
+
+bedrooms_all <- bind_rows(bedrooms, bedrooms10_pivoted)
+
+# Calculate Estimates using Blockgroup splits from Elmer Parcelization Data 
+in_hct_split <- hct_blockgroup %>%
+  filter(planning_geog=="in station area or rgc") %>%
+  select(geoid="data_geog", year="ofm_estimate_year", inside_split="percent_of_occupied_housing_units")
+
+out_hct_split <- hct_blockgroup %>%
+  filter(planning_geog=="not in station area or rgc") %>%
+  select(geoid="data_geog", year="ofm_estimate_year", outside_split="percent_of_occupied_housing_units")
+
+bedrooms_by_hct <- left_join(bedrooms_all, in_hct_split, by=c("geoid", "year")) %>% 
+  mutate(inside_split=replace_na(inside_split, 0)) %>%
+  mutate(inside_estimate = round(estimate*inside_split,0))
+
+bedrooms_by_hct <- left_join(bedrooms_by_hct, out_hct_split, by=c("geoid", "year")) %>% 
+  mutate(outside_split=replace_na(outside_split, 0)) %>%
+  mutate(outside_estimate = round(estimate*outside_split,0))
+
+# Create Clean Blockgroup Data
+bedrooms_by_hct <- bedrooms_by_hct %>%
+  select("geoid","county","variable","year",`Inside centers and HCT station areas`="inside_estimate",`Outside centers and HCT station areas`="outside_estimate") %>%
+  pivot_longer(!c(geoid,county,variable,year), names_to = "metric", values_to = "estimate") 
+
+# Create Summary Chart
+bedrooms_summary <- bedrooms_by_hct %>%
+  group_by(county, year, variable, metric) %>%
+  summarise(estimate=sum(estimate)) %>%
+  as_tibble()
+
+region_summary <- bedrooms_by_hct %>%
+  group_by(year, variable, metric) %>%
+  summarise(estimate=sum(estimate)) %>%
+  as_tibble() %>%
+  mutate(county="Region Total")
+
+bedrooms_summary <- bind_rows(bedrooms_summary, region_summary) %>%
+  mutate(county = factor(county, levels=county_order)) %>%
+  mutate(variable = factor(variable, levels=bedrooms_order))
+
+totals <- bedrooms_summary %>% filter(variable=="Total") %>% rename(total=estimate) %>% select(-"variable")
+
+bedrooms_summary <- left_join(bedrooms_summary, totals, by=c("county","year", "metric")) %>%
+  mutate(share=estimate/total) %>%
+  select(-"total")
+
+bedrooms_chart_2010 <- static_column_chart(t = bedrooms_summary %>% filter(year==2010 & variable!="Total" & county=="Region Total"),
+                                           x = "variable", y="share", fill="metric", color="obgnpgy_5",
+                                           title="Ownership Housing by Number of Bedrooms: 2010",
+                                           source="Source: US Census Bureau 2006-2010 American Community Survey 5-year Estimates Table B25042") +
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 0, vjust = 0.5, hjust=0.5)) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) 
+
+bedrooms_chart_2013 <- static_column_chart(t = bedrooms_summary %>% filter(year==2013 & variable!="Total" & county=="Region Total"),
+                                           x = "variable", y="share", fill="metric", color="obgnpgy_5",
+                                           title="Ownership Housing by Number of Bedrooms: 2013",
+                                           source="Source: US Census Bureau 2009-2013 American Community Survey 5-year Estimates Table B25042") +
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 0, vjust = 0.5, hjust=0.5)) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) 
+
+bedrooms_chart_2018 <- static_column_chart(t = bedrooms_summary %>% filter(year==2018 & variable!="Total" & county=="Region Total"),
+                                           x = "variable", y="share", fill="metric", color="obgnpgy_5",
+                                           title="Ownership Housing by Number of Bedrooms: 2018",
+                                           source="Source: US Census Bureau 2014-2018 American Community Survey 5-year Estimates Table B25042") +
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 0, vjust = 0.5, hjust=0.5)) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) 
+
+# bedrooms_chart_2021 <- static_column_chart(t = bedrooms_summary %>% filter(year==2021 & variable!="Total" & county=="Region Total"),
+#                                            x = "variable", y="share", fill="metric", color="obgnpgy_5",
+#                                            title="Ownership Housing by Number of Bedrooms: 2021",
+#                                            source="Source: US Census Bureau 2017-2021 American Community Survey 5-year Estimates Table B25042") +
+#   ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 0, vjust = 0.5, hjust=0.5)) +
+#   scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) 
+
+bedrooms_chart_2023 <- static_column_chart(t = bedrooms_summary %>% filter(year==2023 & variable!="Total" & county=="Region Total"),
+                                           x = "variable", y="share", fill="metric", color="obgnpgy_5",
+                                           title="Ownership Housing by Number of Bedrooms: 2023",
+                                           source="Source: US Census Bureau 2019-2023 American Community Survey 5-year Estimates Table B25042") +
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 0, vjust = 0.5, hjust=0.5)) + scale_x_discrete(labels = function(x) str_wrap(x, width = 10))
+
+rm(in_hct_split, out_hct_split, totals, region_summary)
+
+### bedrooms by rentals
+
+bedrooms <- get_acs_recs(geography = 'block group', table.names = c('B25042'), years = years)
+
+bedrooms <- bedrooms %>%
+  select(geoid="GEOID", geography="census_geography", "estimate", "moe", "variable", "year", "label") %>%
+  filter(grepl('Renter', label)) %>%
+  separate(variable, into=c("table","variable"), sep="_", remove=TRUE) %>%
+  mutate(variable = as.integer(variable)) %>%
+  mutate(label = case_when(variable ==009 ~ "Total",
+                           variable ==010 ~ "No bedroom",
+                           variable ==011 ~ "1 bedroom",
+                           variable ==012 ~ "2 bedrooms",
+                           variable ==013 ~ "3 bedrooms",
+                           variable ==014 ~ "4 bedrooms",
+                           variable ==015 ~ "5+ bedrooms")) %>%
+  select(-"geography",-"table",-"variable") %>%
+  group_by(geoid, year, label) %>%
+  summarise(estimate=sum(estimate)) %>%
+  as_tibble() %>%
+  rename(variable="label") %>%
+  mutate(county=case_when(
+    str_detect(geoid, "53033") ~ "King County",
+    str_detect(geoid, "53035") ~ "Kitsap County",
+    str_detect(geoid, "53053") ~ "Pierce County",
+    str_detect(geoid, "53061") ~ "Snohomish County"))
+
+# Download 2010 ACS data and clean
+bedrooms10 <- read_csv("J:\\Projects\\V2050\\Housing\\Monitoring\\2024Update\\Data\\metric10_ownership_near_transit\\2010_files\\nhgis0001_csv\\B25042\\bedrooms-2010-5yr.csv") %>% 
+  rename(geoid="GEOID") %>%
+  rename(year="YEAR") %>%
+  mutate(geoid = str_remove_all(geoid, "15000US")) %>% 
+  select("year", "geoid", "estimate-009", "estimate-010", "estimate-011", "estimate-012", "estimate-013", "estimate-014", "estimate-015", "moe-009", "moe-010", "moe-011", "moe-012", "moe-013", "moe-014", "moe-015") %>%
+  mutate(county=case_when(
+    str_detect(geoid, "53033") ~ "King County",
+    str_detect(geoid, "53035") ~ "Kitsap County",
+    str_detect(geoid, "53053") ~ "Pierce County",
+    str_detect(geoid, "53061") ~ "Snohomish County"))
+
+bedrooms10_pivoted <- bedrooms10 %>% 
+  pivot_longer(cols = !c(year, county, geoid), names_to = c(".value", "variable"), names_sep = "-") %>%
+  mutate(variable = factor(variable, levels=c("009", "010", "011", "012", "013", "014", "015"))) %>%
+  mutate(variable = case_when(variable =="009" ~ "Total",
+                              variable =="010" ~ "No bedroom",
+                              variable =="011" ~ "1 bedroom",
+                              variable =="012" ~ "2 bedrooms",
+                              variable =="013" ~ "3 bedrooms",
+                              variable =="014" ~ "4 bedrooms",
+                              variable =="015" ~ "5+ bedrooms")) %>%
+  as_tibble() %>%
+  mutate(county=case_when(
+    str_detect(geoid, "53033") ~ "King County",
+    str_detect(geoid, "53035") ~ "Kitsap County",
+    str_detect(geoid, "53053") ~ "Pierce County",
+    str_detect(geoid, "53061") ~ "Snohomish County"))
+
+
+#Combine 2010 with Other Years
+
+bedrooms_all <- bind_rows(bedrooms, bedrooms10_pivoted)
+
+# Calculate Estimates using Blockgroup splits from Elmer Parcelization Data 
+in_hct_split <- hct_blockgroup %>%
+  filter(planning_geog=="in station area or rgc") %>%
+  select(geoid="data_geog", year="ofm_estimate_year", inside_split="percent_of_occupied_housing_units")
+
+out_hct_split <- hct_blockgroup %>%
+  filter(planning_geog=="not in station area or rgc") %>%
+  select(geoid="data_geog", year="ofm_estimate_year", outside_split="percent_of_occupied_housing_units")
+
+bedrooms_by_hct <- left_join(bedrooms_all, in_hct_split, by=c("geoid", "year")) %>% 
+  mutate(inside_split=replace_na(inside_split, 0)) %>%
+  mutate(inside_estimate = round(estimate*inside_split,0))
+
+bedrooms_by_hct <- left_join(bedrooms_by_hct, out_hct_split, by=c("geoid", "year")) %>% 
+  mutate(outside_split=replace_na(outside_split, 0)) %>%
+  mutate(outside_estimate = round(estimate*outside_split,0))
+
+# Create Clean Blockgroup Data
+bedrooms_by_hct <- bedrooms_by_hct %>%
+  select("geoid","county","variable","year",`Inside centers and HCT station areas`="inside_estimate",`Outside centers and HCT station areas`="outside_estimate") %>%
+  pivot_longer(!c(geoid,county,variable,year), names_to = "metric", values_to = "estimate") 
+
+# Create Summary Chart
+bedrooms_summary <- bedrooms_by_hct %>%
+  group_by(county, year, variable, metric) %>%
+  summarise(estimate=sum(estimate)) %>%
+  as_tibble()
+
+region_summary <- bedrooms_by_hct %>%
+  group_by(year, variable, metric) %>%
+  summarise(estimate=sum(estimate)) %>%
+  as_tibble() %>%
+  mutate(county="Region Total")
+
+bedrooms_summary <- bind_rows(bedrooms_summary, region_summary) %>%
+  mutate(county = factor(county, levels=county_order)) %>%
+  mutate(variable = factor(variable, levels=bedrooms_order))
+
+totals <- bedrooms_summary %>% filter(variable=="Total") %>% rename(total=estimate) %>% select(-"variable")
+
+bedrooms_summary <- left_join(bedrooms_summary, totals, by=c("county","year", "metric")) %>%
+  mutate(share=estimate/total) %>%
+  select(-"total")
+
+bedrooms_chart_2010_rent <- static_column_chart(t = bedrooms_summary %>% filter(year==2010 & variable!="Total" & county=="Region Total"),
+                                           x = "variable", y="share", fill="metric", color="obgnpgy_5",
+                                           title="Rental Housing by Number of Bedrooms: 2010",
+                                           source="Source: US Census Bureau 2006-2010 American Community Survey 5-year Estimates Table B25042") +
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 0, vjust = 0.5, hjust=0.5)) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) 
+
+bedrooms_chart_2013_rent <- static_column_chart(t = bedrooms_summary %>% filter(year==2013 & variable!="Total" & county=="Region Total"),
+                                                x = "variable", y="share", fill="metric", color="obgnpgy_5",
+                                                title="Rental Housing by Number of Bedrooms: 2013",
+                                                source="Source: US Census Bureau 2009-2013 American Community Survey 5-year Estimates Table B25042") +
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 0, vjust = 0.5, hjust=0.5)) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) 
+
+bedrooms_chart_2018_rent <- static_column_chart(t = bedrooms_summary %>% filter(year==2018 & variable!="Total" & county=="Region Total"),
+                                           x = "variable", y="share", fill="metric", color="obgnpgy_5",
+                                           title="Rental Housing by Number of Bedrooms: 2018",
+                                           source="Source: US Census Bureau 2014-2018 American Community Survey 5-year Estimates Table B25042") +
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 0, vjust = 0.5, hjust=0.5)) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) 
+
+bedrooms_chart_2023_rent <- static_column_chart(t = bedrooms_summary %>% filter(year==2023 & variable!="Total" & county=="Region Total"),
+                                           x = "variable", y="share", fill="metric", color="obgnpgy_5",
+                                           title="Rental Housing by Number of Bedrooms: 2023",
+                                           source="Source: US Census Bureau 2019-2023 American Community Survey 5-year Estimates Table B25042") +
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 0, vjust = 0.5, hjust=0.5)) + scale_x_discrete(labels = function(x) str_wrap(x, width = 10))
+
+rm(in_hct_split, out_hct_split, totals, region_summary)
+
+
+#write_csv(bedrooms_summary, file = 'J:/Projects/V2050/Housing/Monitoring/2025Update/Data/metric10_own_opps\\ownershipbedrooms2025.csv')
+
+## Look at HCT areas only 
+
+# Blockgroup Splits from Elmer --------------------------------------------
+hct_only_blockgroup <- NULL
+
+q10 <- paste0("SELECT * FROM general.get_geography_splits('blockgroup10', 'HCT Station Areas (Vision 2050)', 2010, 2020, 2014)")
+q13 <- paste0("SELECT * FROM general.get_geography_splits('blockgroup10', 'HCT Station Areas (Vision 2050)', 2013, 2020, 2014)")
+q18 <- paste0("SELECT * FROM general.get_geography_splits('blockgroup10', 'HCT Station Areas (Vision 2050)', 2018, 2020, 2018)")
+#q21 <- paste0("SELECT * FROM general.get_geography_splits('blockgroup20', 'HCT Station Areas (Vision 2050)', 2021, 2022, 2018)")
+q23 <- paste0("SELECT * FROM general.get_geography_splits('blockgroup20', 'HCT Station Areas (Vision 2050)', 2023, 2023, 2018)")
+
+s10 <- get_query(sql = q10, db_name = "Elmer")
+s13 <- get_query(sql = q13, db_name = "Elmer")
+s18 <- get_query(sql = q18, db_name = "Elmer")
+#s21 <- get_query(sql = q21, db_name = "Elmer")
+s23 <- get_query(sql = q23, db_name = "Elmer")
+
+hct_only_blockgroup <- bind_rows(s13, s18, s23)
+rm(q13, q18, q23, s13, s18, s23)
+
+# Housing Tenure ----------------------------------------------------------
+
+# Download ACS data and clean
+tenure_hct <- get_acs_recs(geography = 'block group', table.names = c('B25003'), years = years)
+
+tenure_hct <- tenure_hct %>%
+  dplyr::select(geoid="GEOID", geography="census_geography", "estimate", "moe", "variable", "year") %>%
+  mutate(variable = factor(case_when(variable == "B25003_001" ~ "total households",
+                                     variable == "B25003_002" ~ "owner",
+                                     variable == "B25003_003" ~ "renter",
+                                     !is.na(variable) ~"N/A"),
+                           levels=c("total households","owner","renter")))
+
+# Download 2010 ACS data and clean
+tenure10 <- read_csv("J:\\Projects\\V2050\\Housing\\Monitoring\\2024Update\\Data\\metric10_ownership_near_transit\\2010_files\\nhgis0001_csv\\B25003\\Tenure-2010-5yr.csv") %>% 
+  mutate(geoid = str_remove_all(geoid, "15000US")) %>% 
+  dplyr::select("year", "county", "geoid", `estimate-total households`="total households", `estimate-owner`="owner", `estimate-renter`="renter", `moe-total households`="total-moe", `moe-owner`="owner-moe", `moe-renter`="renter-moe") 
+
+tenure10_pivoted <- tenure10 %>% 
+  pivot_longer(cols = !c(year, county, geoid), names_to = c(".value", "variable"), names_sep = "-") %>%
+  mutate(variable = factor(variable, levels=c("total households","owner","renter")))
+
+#Combine 2010 with Other Years
+
+tenure_all_hct <- bind_rows(tenure_hct, tenure10_pivoted) %>% dplyr::select(-"county", -"geography")
+
+# Calculate Estimates using Blockgroup splits from Elmer Parcelization Data 
+in_hct_split <- hct_only_blockgroup %>%
+  filter(planning_geog=="in station area") %>%
+  dplyr::select(geoid="data_geog", year="ofm_estimate_year", inside_split="percent_of_occupied_housing_units")
+
+out_hct_split <- hct_only_blockgroup %>%
+  filter(planning_geog=="not in station area") %>%
+  dplyr::select(geoid="data_geog", year="ofm_estimate_year", outside_split="percent_of_occupied_housing_units")
+
+tenure_by_hct_only <- left_join(tenure_all_hct, in_hct_split, by=c("geoid", "year")) %>% 
+  mutate(inside_split=replace_na(inside_split, 0)) %>%
+  mutate(inside_estimate = round(estimate*inside_split,0))
+
+tenure_by_hct_only <- left_join(tenure_by_hct_only, out_hct_split, by=c("geoid", "year")) %>% 
+  mutate(outside_split=replace_na(outside_split, 0)) %>%
+  mutate(outside_estimate = round(estimate*outside_split,0))
+
+# Add County Name
+tenure_by_hct_only <- tenure_by_hct_only %>%
+  mutate(county=case_when(
+    str_detect(geoid, "53033") ~ "King County",
+    str_detect(geoid, "53035") ~ "Kitsap County",
+    str_detect(geoid, "53053") ~ "Pierce County",
+    str_detect(geoid, "53061") ~ "Snohomish County"))
+
+# Create Clean Blockgroup Data
+tenure_by_hct_only <- tenure_by_hct_only %>%
+  dplyr::select("geoid","county","variable","year",`Inside HCT station areas`="inside_estimate",`Outside HCT station areas`="outside_estimate") %>%
+  pivot_longer(!c(geoid,county,variable,year), names_to = "metric", values_to = "estimate")
+
+# Create Summary Chart
+tenure_summary_hct <- tenure_by_hct_only %>%
+  group_by(county, year, variable, metric) %>%
+  summarise(estimate=sum(estimate)) %>%
+  as_tibble()
+
+region_summary_hct <- tenure_by_hct_only %>%
+  group_by(year, variable, metric) %>%
+  summarise(estimate=sum(estimate)) %>%
+  as_tibble() %>%
+  mutate(county="Region Total")
+
+tenure_summary_hct <- bind_rows(tenure_summary_hct, region_summary_hct) %>%
+  mutate(county = factor(county, levels=county_order))
+
+totals_hct <- tenure_summary_hct %>% filter(variable=="total households") %>% rename(total=estimate) %>% select(-"variable")
+
+tenure_summary_hct <- left_join(tenure_summary_hct, totals_hct, by=c("county","year", "metric")) %>%
+  mutate(share=estimate/total) %>%
+  select(-"total") 
+
+tenure_chart_2010_hct <- static_column_chart(t = tenure_summary_hct %>% filter(year==2010 & variable=="owner"),
+                                         x = "county", y="share", fill="metric", color="pognbgy_5",
+                                         title="Ownership Housing Near Transit: 2010",
+                                         source="Source: US Census Bureau 2006-2010 American Community Survey 5-year Estimates Table B25003")
+
+tenure_chart_2013_hct <- static_column_chart(t = tenure_summary_hct %>% filter(year==2013 & variable=="owner"),
+                                         x = "county", y="share", fill="metric", color="pognbgy_5",
+                                         title="Ownership Housing Near Transit: 2013",
+                                         source="Source: US Census Bureau 2009-2013 American Community Survey 5-year Estimates Table B25003")
+
+tenure_chart_2018_hct <- static_column_chart(t = tenure_summary_hct %>% filter(year==2018 & variable=="owner"),
+                                         x = "county", y="share", fill="metric", color="pognbgy_5",
+                                         title="Ownership Housing Near Transit: 2018",
+                                         source="Source: US Census Bureau 2014-2018 American Community Survey 5-year Estimates Table B25003")
+
+tenure_chart_2023_hct <- static_column_chart(t = tenure_summary_hct %>% filter(year==2023 & variable=="owner"),
+                                         x = "county", y="share", fill="metric", color="pognbgy_5",
+                                         title="Ownership Housing Near Transit: 2023",
+                                         source="Source: US Census Bureau 2019-2023 American Community Survey 5-year Estimates Table B25003")
+
+psrc_col <- c("#00A7A0", "#8CC63E", "#F05A28", "#91268F", "#BBBDC0", "#76787A",
+              "#00A7A0", "#8CC63E", "#F05A28", "#91268F", "#BBBDC0", "#76787A")
+
+tenure_summary_hct$year<-as.character(tenure_summary_hct$year)
+tenure_summary_hct <- tenure_summary_hct %>%
+  mutate(share_rounded = round(share, digits=2)) 
+
+tenure_chart_years_hct <- tenure_summary_hct %>% filter(variable=="owner") %>% filter(year!="2010") %>%
+  ggplot(aes(x=year, y=share, fill=metric, label=share_rounded)) +
+  geom_col(position="dodge") +
+  scale_fill_manual(values=psrc_col) + 
+  facet_wrap(~county, nrow=1, scales="free", strip.position = "bottom") +
+  ggtitle("Ownership Housing Near Transit: 2013, 2018, 2023") +
+  theme(strip.placement="outside", axis.title.x=element_blank()) + 
+  geom_text(position=position_dodge(0.5), vjust=-0.25) +
+  theme(panel.background = element_blank())
+
+tenure_chart_years_hct
+
+rm(in_hct_split, out_hct_split, tenure, totals, region_summary)
+
+#write_csv(tenure_summary_hct, file = 'J:/Projects/V2050/Housing/Monitoring/2025Update/Data/metric10_own_opps\\ownershipopps25.csv')
+
+#### charts
+
+tenure_chart_2010
+tenure_chart_2010_hct
+tenure_chart_2013
+tenure_chart_2013_hct
+tenure_chart_2018
+tenure_chart_2018_hct
+tenure_chart_2023
+tenure_chart_2023_hct
+tenure_chart_years
+tenure_chart_years_hct
+
+value_chart_2013
+value_chart_2018
+value_chart_2023
+
+bedrooms_chart_2010
+bedrooms_chart_2013
+bedrooms_chart_2018
+bedrooms_chart_2023
+
+bedrooms_chart_2010_rent
+bedrooms_chart_2013_rent
+bedrooms_chart_2018_rent
+bedrooms_chart_2023_rent
