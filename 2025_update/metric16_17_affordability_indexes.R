@@ -4,55 +4,50 @@
 # DATE MODIFIED: 5.15.2025
 # AUTHOR: Eric Clute
 
-library(openxlsx)
+library(dplyr)
+library(stringr)
 library(tidyr)
-library(tidyverse)
-library(readr)
+library(writexl)
 
-mb_hai_link <- "https://public.tableau.com/app/profile/mason.virant/viz/County_DB_HAIMedianBuyer_Q1_2025/DB-HAIMedianBuyer?County=King,Kitsap,Pierce,Snohomish"
-ftb_hai_link <- "https://public.tableau.com/app/profile/mason.virant/viz/County_DB_HAIFirstTimeBuyer_Q1_2025/DB-HAIFirstTimeBuyer?County=King,Kitsap,Pierce,Snohomish"
+# "https://public.tableau.com/app/profile/mason.virant/viz/County_DB_HAIMedianBuyer_Q1_2025/DB-HAIMedianBuyer?County=King,Kitsap,Pierce,Snohomish"
+# "https://public.tableau.com/app/profile/mason.virant/viz/County_DB_HAIFirstTimeBuyer_Q1_2025/DB-HAIFirstTimeBuyer?County=King,Kitsap,Pierce,Snohomish"
 
-# --------------- Download Data ---------------
-mb_hai_raw <- read_csv(mb_hai_link)
+mb_hai_path <- "J:/Projects/V2050/Housing/Monitoring/2025Update/data/metric16_17_affordability_indexes/raw/hai_median_data.csv"
+ftb_hai_path <- "J:/Projects/V2050/Housing/Monitoring/2025Update/data/metric16_17_affordability_indexes/raw/hai_firsttime_data.csv"
+output_file <- "J:/Projects/V2050/Housing/Monitoring/2025Update/data/metric16_17_affordability_indexes/r_export_hai.xlsx"
 
- 
+quarter <- "Q1"  #which quarter are we interested in?
 
+# --------------- Create function(s) ---------------
+filter_and_pivot_by_quarter <- function(df, quarter) {
+  # Identify relevant column names
+  period_col <- names(df)[startsWith(names(df), "Period")]
+  county_col <- names(df)[startsWith(names(df), "County")]
+  hai_col    <- names(df)[startsWith(names(df), "HAI")]
+  
+  # Filter and pivot
+  df %>%
+    filter(str_ends(.data[[period_col]], quarter)) %>%
+    select(all_of(c(period_col, county_col, hai_col))) %>%
+    pivot_wider(
+      names_from = all_of(county_col),
+      values_from = all_of(hai_col)
+    )
+}
 
+# --------------- Pull Data ---------------
+mb_hai <- read.csv(mb_hai_path)
+ftb_hai <- read.csv(ftb_hai_path)
 
-
-
-
-
-
-
-
-
-# --------------- Median Home Buyer (HAI) ---------------
-# Select County and Q1 variables
-select_county <- grep("County", names(mb_hai_raw))
-select_q1 <- grep("Q1", names(mb_hai_raw))
-
-mb_hai <- mb_hai_raw %>% select(all_of(c(select_county,select_q1)))
-
-# Select PSRC counties
-mb_hai <- mb_hai[mb_hai$County %in% c("King", "Kitsap", "Pierce", "Snohomish"),]
-
-# --------------- First-Time Home Buyer (HAI) ---------------
-# Select County and Q1 variables
-select_county <- grep("County", names(ftb_hai_raw))
-select_q1 <- grep("Q1", names(ftb_hai_raw))
-
-ftb_hai <- ftb_hai_raw %>% select(all_of(c(select_county,select_q1)))
-
-# Select PSRC counties
-ftb_hai <- ftb_hai[ftb_hai$County %in% c("King", "Kitsap", "Pierce", "Snohomish"),]
+# --------------- Run Function, clean data ---------------
+mb_hai_filtered <- filter_and_pivot_by_quarter(mb_hai,quarter)
+ftb_hai_filtered <- filter_and_pivot_by_quarter(ftb_hai,quarter)
 
 # --------------- Export to Excel ---------------
-setwd("J:/Projects/V2050/Housing/Monitoring/2025Update/data/metric16_17_affordability_indexes")
-
-work_book <- createWorkbook()
-addWorksheet(work_book, sheetName = "first_time_buyer_hai")
-writeData(work_book, "first_time_buyer_hai", ftb_hai)
-addWorksheet(work_book, sheetName = "median_buyer_hai")
-writeData(work_book, "median_buyer_hai", mb_hai)
-saveWorkbook(work_book, file = "r_output_HAI_Q1.xlsx", overwrite = TRUE)
+write_xlsx(
+  list(
+    "mb_hai_filtered" = mb_hai_filtered,
+    "ftb_hai_filtered" = ftb_hai_filtered
+  ),
+  path = output_file
+)
