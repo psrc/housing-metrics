@@ -29,7 +29,7 @@ pat_file <- read.csv('H:/chas-pat.txt', header = FALSE)
 pat <- pat_file[[1]][1]
 
 # read-in file of data-dictionary
-prop_dict <- read.csv(here('process', 'CHAS', 'chas-response-prop.csv'))
+prop_dict <- read.csv(here('archive', 'process', 'CHAS', 'chas-response-prop.csv'))
 
 # request county summaries and convert to dataframe
 counties <- c(33, 35, 53, 61)
