@@ -13,23 +13,25 @@ save_path <- "J:/Projects/V2050/Housing/Monitoring/2025Update/data/metric14_medi
 
 metro_area <- "Seattle, WA"
 earliestdate <- "2012-07-01"
-latestdate <- "2025-02-01"
+latestdate <- "2025-06-01"
 
 # Import Redfin data, limit to metro area and by date
 redfin_raw <- read_tsv(value_url)
 
 # Limited to Metro area selected above
 value <- redfin_raw %>%
-  filter(str_detect(region, metro_area)) %>%
+  filter(str_detect(REGION, metro_area)) %>%
   transmute(
-    date = period_begin,
-    region = region,
-    property_type = property_type,
-    median_sale_price = median_sale_price)
+    date = PERIOD_BEGIN,
+    region = REGION,
+    property_type = PROPERTY_TYPE,
+    median_sale_price = MEDIAN_SALE_PRICE,
+    seasonally_adjusted = IS_SEASONALLY_ADJUSTED)
 
 # limit to all residential properties, restrict to date range selected above
 value <- value %>%
-  filter(!(property_type == "Multi-Family (2-4 Unit)"))
+  filter(!(property_type == "Multi-Family (2-4 Unit)"),
+         seasonally_adjusted == "TRUE")
 value <- with(value, value[(date >= earliestdate & date <= latestdate), ])
 value$month <- str_sub(value$date, 1, 7)
 

@@ -1,7 +1,7 @@
 # TITLE: Median Sale Price by County
 # GEOGRAPHIES: All four counties
 # DATA SOURCE: Redfin (https://public.tableau.com/shared/GRN635HN7?:display_count=n&:origin=viz_share_link)
-# DATE MODIFIED: 4.17.2025
+# DATE MODIFIED: 7.16.2025
 # AUTHOR: Eric Clute
 
 library(dplyr)
@@ -11,7 +11,7 @@ library(tidyr)
 
 data_path <- "J:/Projects/V2050/Housing/Monitoring/2025Update/data/metric15_median_home_price_by_county/data_redfin.csv"
 save_path <- "J:/Projects/V2050/Housing/Monitoring/2025Update/data/metric15_median_home_price_by_county/metric15_raw.csv"
-month <- "Feb"
+month <- "Jun"
 
 # Pull in data downloaded from tableau dashboard (make sure all 4 counties are visible before exporting to CSV)
 county_raw <- read.csv(data_path)
