@@ -6,25 +6,28 @@
 
 library(dplyr)
 library(stringr)
-library(openxlsx)
+library(readr)
 library(tidyr)
 
 data_path <- "J:/Projects/V2050/Housing/Monitoring/2025Update/data/metric15_median_home_price_by_county/data_redfin.csv"
 save_path <- "J:/Projects/V2050/Housing/Monitoring/2025Update/data/metric15_median_home_price_by_county/metric15_raw.csv"
-month <- "Jun"
+month <- "June"
 
 # Pull in data downloaded from tableau dashboard (make sure all 4 counties are visible before exporting to CSV)
-county_raw <- read.csv(data_path)
+county_raw <- read_tsv(file = data_path, locale = locale(encoding = "UTF-16LE"))
 
-# Remove unneeded fields
-county <- county_raw %>% select(c(Region, Month.of.Period.End,Median.Sale.Price))
+# Clean
+colnames(county_raw) <- as.character(county_raw[1, ])
+county_raw <- county_raw[-1, ]
 
-# Clean up numeric data
-county$Median.Sale.Price <- gsub("\\$", "", gsub("K", "000", county$Median.Sale.Price))
-
-# Filter to month & pivot
-county <- county[startsWith(county$Month.of.Period.End, month), ]
-county_piv <- county %>% pivot_wider(names_from = Region, values_from = Median.Sale.Price)
+county <- county_raw %>%
+  select(1, starts_with(month)) %>%
+  mutate(across(
+    .cols = -1,                               # Apply to all columns except the first (region)
+    .fns = ~ as.numeric(
+      str_replace_all(.x, "\\$", "") |>       # Remove $
+        str_replace_all("K", "000")           # Replace K with 000
+    )))
 
 # Export
-write.csv(county_piv, file = save_path)
+write.csv(county, file = save_path)
