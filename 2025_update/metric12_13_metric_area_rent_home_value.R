@@ -1,7 +1,7 @@
 # TITLE: Home Value & Rent 
 # GEOGRAPHIES: Seattle MSA
 # DATA SOURCE: Zillow, OFM, 1YR ACS PUMS
-# DATE MODIFIED: 4.09.2025
+# DATE MODIFIED: 7.30.2025
 # AUTHOR: Eric Clute
 
 library(openxlsx)
@@ -26,7 +26,8 @@ ZORI_url <- "https://files.zillowstatic.com/research/public_csvs/zori/Metro_zori
 ofm_inc_url <- "https://ofm.wa.gov/sites/default/files/public/dataresearch/economy/median_household_income_estimates.xlsx"
 ofm_inc_file <- "median_household_income_estimates.xlsx"
 
-years <- c(2015,2016,2017,2018,2019,2021,2022,2023)
+years <- c(2015,2016,2017,2018,2019,2021,2022,2023) #ACS
+date <- "06.30" # final month of data from Zillow
 counties <- c("King", "Pierce", "Snohomish")
 dir <- "J:/Projects/Census/AmericanCommunitySurvey/Data/PUMS/pums_rds"
 
@@ -123,6 +124,17 @@ all_data %<>%
   relocate(source, .before = RegionID)
 
 colnames(all_data)<-gsub("X","",colnames(all_data))
+
+# Keep columns that:
+# - are named like a date (e.g., "2015.06.30")
+# - and end in "06.30"
+date_cols <- grep("^\\d{4}\\.\\d{2}\\.\\d{2}$", colnames(all_data), value = TRUE)
+date_cols <- date_cols[grepl(date, date_cols)]
+
+# Also keep any ID or metadata columns you want to retain
+keep_cols <- c("RegionID", "RegionName","RegionType","source", date_cols)
+all_data <- all_data[, intersect(keep_cols, colnames(all_data))]
+
 
 # Export
 write.csv(all_data, file = file.path(export_path, "metric12_13_raw.csv"), row.names = FALSE)
