@@ -1,6 +1,6 @@
 # Processing Raw CoStar Data for Housing Monitoring
 # Geographies: RGCs, HCTs, Counties
-# Data Vintage: Q3 2025 QTD
+# Data Vintage: Q2 2025
 # Created By: Eric Clute
 
 # Assumptions ---------------------
@@ -19,12 +19,13 @@ hct_data_path <- "J:/Projects/V2050/Housing/Monitoring/2025Update/Data/metric18_
 county_data_path <- "J:/Projects/V2050/Housing/Monitoring/2025Update/Data/metric18_avg_asking_rent/raw_county"
 reference_path <- "J:/Projects/V2050/Housing/Monitoring/2025Update/Data/metric18_avg_asking_rent/reference_table.xlsx"
 export_path <- "J:/Projects/V2050/Housing/Monitoring/2025Update/Data/metric18_avg_asking_rent"
-rgc_source_info <- c("CoStar, Q3 2025 QTD. Calculated by Eric Clute, 7/30/2025. Includes all 1-bedroom unit data inside RGC (excludes Federal Way, Issaquah due to missing data). Rent rounded to nearest 10.")
-hct_source_info <- c("CoStar, Q3 2025 QTD. Calculated by Eric Clute, 7/30/2025. Includes all 1-bedroom unit data inside HCT (excludes Port Orchard Ferry Terminal, Poulsbo, Mukilteo due to missing data). Rent rounded to nearest 10.")
-county_source_info <- c("CoStar, Q3 2025 QTD. Calculated by Eric Clute, 7/30/2025. Includes all 1-bedroom unit data inside county. Rent rounded to nearest 10.")
+rgc_source_info <- c("CoStar, Q2 2025. Calculated by Eric Clute, 7/30/2025. Includes all 1-bedroom unit data inside RGC (excludes Federal Way, Issaquah due to missing data). Rent rounded to nearest 10.")
+hct_source_info <- c("CoStar, Q2 2025. Calculated by Eric Clute, 7/30/2025. Includes all 1-bedroom unit data inside HCT (excludes Port Orchard Ferry Terminal, Poulsbo, Mukilteo due to missing data). Rent rounded to nearest 10.")
+county_source_info <- c("CoStar, Q2 2025. Calculated by Eric Clute, 7/30/2025. Includes all 1-bedroom unit data inside county. Rent rounded to nearest 10.")
 
-latestdate <- "2025 Q3 QTD"
-earliestdate <- "2019 Q3"
+latestdate <- "2025 Q2"
+midperioddate <- "2020 Q2"
+earliestdate <- "2019 Q2"
 
 inflation_year <- (2025)
 reported_year_to_adjust <- (2019)
@@ -39,7 +40,7 @@ read_excel_with_filename <- function(file_path) {
   
   # Extract column names and first row of data
   col_names <- colnames(data)
-  first_row <- slice(data, which(data$Period %in% c(latestdate, earliestdate)))
+  first_row <- slice(data, which(data$Period %in% c(latestdate, midperioddate, earliestdate)))
   
   # Add filename as a column without the .xlsx extension
   filename <- gsub("\\.xlsx$", "", basename(file_path))
@@ -120,6 +121,11 @@ ld <- paste0("Asking Rent Per Unit_", latestdate) # Construct the field name dyn
 
 combined_data_piv$prct_change_rent <- (combined_data_piv[[ld]] - combined_data_piv[[ed]]) / combined_data_piv[[ed]]
 
+ed <- paste0("Inventory Units_", earliestdate) # Construct the field name dynamically
+ld <- paste0("Inventory Units_", latestdate) # Construct the field name dynamically
+
+combined_data_piv$prct_change_inventory <- (combined_data_piv[[ld]] - combined_data_piv[[ed]]) / combined_data_piv[[ed]]
+
 # Combine w/reference table
 combined_data_piv <- left_join(combined_data_piv, reference_table, by = "name")
 
@@ -128,17 +134,17 @@ combined_data_piv <- left_join(combined_data_piv, reference_table, by = "name")
 # Summarize by Center
 by_rgc <- combined_data_piv %>%
   filter(type == "rgc") %>%
-  select(name, starts_with("Inventory Units_"), starts_with("Asking Rent Per Unit_"), prct_change_rent, type, county)
+  select(name, starts_with("Inventory Units_"), starts_with("Asking Rent Per Unit_"), prct_change_rent, prct_change_inventory, type, county)
 
 # Summarize by Center
 by_hct <- combined_data_piv %>%
   filter(type == "hct") %>%
-  select(name, starts_with("Inventory Units_"), starts_with("Asking Rent Per Unit_"), prct_change_rent, type, county)
+  select(name, starts_with("Inventory Units_"), starts_with("Asking Rent Per Unit_"), prct_change_rent, prct_change_inventory, type, county)
 
 # Summarize by Center
 by_county <- combined_data_piv %>%
   filter(is.na(type)) %>%
-  select(name, starts_with("Inventory Units_"), starts_with("Asking Rent Per Unit_"), prct_change_rent, type, county)
+  select(name, starts_with("Inventory Units_"), starts_with("Asking Rent Per Unit_"), prct_change_rent, prct_change_inventory, type, county)
 
 # Cleanup and export ---------------------
 
