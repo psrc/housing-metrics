@@ -9,10 +9,6 @@ library(dplyr)
 library(purrr)
 library(openxlsx)
 library(tidyr)
-library(fredr) # Requires API key
-library(psrccensus) # Required for inflation adjustment
-
-fredr_set_key("99e2d81f189630d83b9e37ba8ca4f142")
 
 rgc_data_path <- "J:/Projects/V2050/Housing/Monitoring/2025Update/Data/metric18_avg_asking_rent/raw_rgc"
 hct_data_path <- "J:/Projects/V2050/Housing/Monitoring/2025Update/Data/metric18_avg_asking_rent/raw_hct"
@@ -26,9 +22,6 @@ county_source_info <- c("CoStar, Q2 2025. Calculated by Eric Clute, 7/30/2025. I
 latestdate <- "2025 Q2"
 midperioddate <- "2020 Q2"
 earliestdate <- "2019 Q2"
-
-inflation_year <- (2025)
-reported_year_to_adjust <- (2019)
 
 reference_table <- read_excel(reference_path)
 
@@ -134,12 +127,12 @@ combined_data_piv <- left_join(combined_data_piv, reference_table, by = "name")
 # Summarize by Center
 by_rgc <- combined_data_piv %>%
   filter(type == "rgc") %>%
-  select(name, starts_with("Inventory Units_"), starts_with("Asking Rent Per Unit_"), prct_change_rent, prct_change_inventory, type, county)
+  select(name, starts_with("Inventory Units_"), starts_with("Asking Rent Per Unit_"), prct_change_rent, prct_change_inventory, type, type2, county)
 
 # Summarize by Center
 by_hct <- combined_data_piv %>%
   filter(type == "hct") %>%
-  select(name, starts_with("Inventory Units_"), starts_with("Asking Rent Per Unit_"), prct_change_rent, prct_change_inventory, type, county)
+  select(name, starts_with("Inventory Units_"), starts_with("Asking Rent Per Unit_"), prct_change_rent, prct_change_inventory, type, type2, county)
 
 # Summarize by Center
 by_county <- combined_data_piv %>%
