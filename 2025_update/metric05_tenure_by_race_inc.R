@@ -1,7 +1,7 @@
 # TITLE: Tenure by Race/Ethnicity and Income
 # GEOGRAPHIES: PSRC Region & County
 # DATA SOURCE: 5YR ACS PUMS
-# DATE MODIFIED: 4.17.2025
+# DATE CREATED: 4.17.2025
 # AUTHOR: Eric Clute & Carol Naito
 
 library(psrccensus)
@@ -29,7 +29,8 @@ tenure_re_func <- function(year){
     mutate(tenure=factor(case_when(TEN=="Owned free and clear"|TEN=="Owned with mortgage or loan (include home equity loans)" ~ "owner", !is.na(TEN) ~"renter"),
                          levels=c("owner", "renter")),
            PRACE=factor(
-             case_when(grepl("Other Race|Two or More Races", PRACE) ~"Other or Multiple Races",
+             case_when(grepl("^Some", PRACE) ~"Another Racial Identity",
+                       grepl("^Two", PRACE) ~"Multiracial",
                        grepl("^Black ", PRACE) ~"Black",
                        grepl("^Hispanic ", PRACE) ~"Hispanic/Latinx",
                        !is.na(PRACE) ~stringr::str_replace_all(as.character(PRACE), " (and|or) ", "/") %>%
@@ -100,7 +101,8 @@ tenure_inc_func <- function(year){
            tenure=factor(case_when(TEN=="Owned free and clear"|TEN=="Owned with mortgage or loan (include home equity loans)" ~ "owner", !is.na(TEN) ~"renter"),
                          levels=c("owner", "renter")),
            PRACE=factor(
-             case_when(grepl("Other Race|Two or More Races", PRACE) ~"Other or Multiple Races",
+             case_when(grepl("^Some", PRACE) ~"Another Racial Identity",
+                       grepl("^Two", PRACE) ~"Multiracial",
                        grepl("^Black ", PRACE) ~"Black",
                        grepl("^Hispanic ", PRACE) ~"Hispanic/Latinx",
                        !is.na(PRACE) ~stringr::str_replace_all(as.character(PRACE), " (and|or) ", "/") %>%

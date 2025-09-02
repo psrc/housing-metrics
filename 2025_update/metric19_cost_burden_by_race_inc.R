@@ -1,7 +1,7 @@
 # TITLE: Renter Cost Burden by Race
 # GEOGRAPHIES: PSRC Region
 # DATA SOURCE: ACS PUMS 5YR
-# DATE MODIFIED: 4.17.2025
+# DATE CREATED: 4.17.2025
 # AUTHOR: Eric Clute
 
 library(magrittr)
@@ -66,7 +66,8 @@ rcb_re_func <- function(rcb){
   rcb <- rcb %>% filter(TEN=="Rented") %>%
     mutate(
       rent_burden = create_rent_burden_column(GRPIP),
-      PRACE=factor(case_when(grepl("Other Race|Two or More Races", PRACE) ~"Other or Multiple Races",
+      PRACE=factor(case_when(grepl("^Some", PRACE) ~"Another Racial Identity",
+                             grepl("^Two", PRACE) ~"Multiracial",
                              grepl("^Black ", PRACE) ~"Black",
                              grepl("^Hispanic ", PRACE) ~"Hispanic/Latinx",
                              !is.na(PRACE) ~stringr::str_replace_all(as.character(PRACE), " (and|or) ", "/") %>%
