@@ -16,7 +16,7 @@ Sys.getenv("CENSUS_API_KEY")
 # 
 # ___AAPI HOUSEHOLD DATASETS___
 # 3.df_pums_aapi: all AAPI households                                                      (use: total household count/ tenure/ income)
-#   - new variables: RAC2P19_aapi_group10 
+#   - new variables: RAC2P_equivalent_aapi_group10 
 #     (grouped race category: top 10 populous Asian subgroups, other Asian 
 #      subgroups and NH&PI)
 # 4. df_pums_renter_aapi: all AAPI renter households                                       (use: cost burden)
@@ -24,7 +24,7 @@ Sys.getenv("CENSUS_API_KEY")
 # 
 # ___AAPI PERSONS DATASETS___
 # 6. df_pums_p_aapi_renter_worker: (person-level) all adults in AAPI renters households    (use: occupation)
-#    - new variables: RAC2P19_aapi_group10_household (workers in RAC2P19_aapi_group10 households)
+#    - new variables: RAC2P_equivalent_aapi_group10_household (workers in RAC2P_equivalent_aapi_group10 households)
 
 # ---- full datasets ---- 
 
@@ -71,7 +71,12 @@ df_pums <- pums_2023_h %>%
                            PRACE=="American Indian or Alaskan Native Alone"~"American Indian or Alaskan Native alone",
                            PRACE=="Some Other Race alone"~"Another Racial Identity",
                            PRACE=="Two or More Races"~"Multiracial", 
-                           TRUE~PRACE))
+                           TRUE~PRACE),
+         RAC2P_equivalent = coalesce(
+           na_if(RAC2P19, "Code classification is Not Applicable because data are 2023 vintage"),
+           na_if(RAC2P23, "Code classification is Not Applicable because data are 2019-2022 vintage")),
+         RAC2P_equivalent = recode(RAC2P_equivalent,
+           "Chinese, except Taiwanese alone" = "Chinese, except Taiwanese, alone"))
 
 ## ----- 2. persons ----- 
 pums_2023_p <- get_psrc_pums(span = 5,
@@ -93,15 +98,20 @@ df_pums_p <- pums_2023_p %>%
                            PRACE=="American Indian or Alaskan Native Alone"~"American Indian or Alaskan Native alone",
                            PRACE=="Some Other Race alone"~"Another Racial Identity",
                            PRACE=="Two or More Races"~"Multiracial", 
-                           TRUE~PRACE))
+                           TRUE~PRACE),
+         RAC2P_equivalent = coalesce(
+           na_if(RAC2P19, "Code classification is Not Applicable because data are 2023 vintage"),
+           na_if(RAC2P23, "Code classification is Not Applicable because data are 2019-2022 vintage")),
+         RAC2P_equivalent = recode(RAC2P_equivalent,
+                                   "Chinese, except Taiwanese alone" = "Chinese, except Taiwanese, alone"))
 
 # ---- AAPI households data ----
 
 # top 10 Asian subgroups with the most households
 asian_top10 <- df_pums %>%
   filter(PRACE == "Asian alone") %>%
-  psrc_pums_count(., group_vars=c("PRACE","RAC2P19")) %>%
-  filter(!RAC2P19 %in% c("All combinations of Asian races only","Other Asian alone","Total")) %>%
+  psrc_pums_count(., group_vars=c("PRACE","RAC2P_equivalent")) %>%
+  filter(!RAC2P_equivalent %in% c("All combinations of Asian races only","Other Asian alone","Total")) %>%
   arrange(desc(count)) %>%
   top_n(7,count)
 
@@ -111,14 +121,14 @@ df_pums_aapi <- df_pums %>%
   filter(PRACE %in% c("Asian alone","Native Hawaiian and Other Pacific Islander alone")) %>%
   mutate(
     # grouped race category: top 10 populous Asian subgroups, other Asian races and all Pacific Islander
-    RAC2P19_aapi_group10 = case_when(PRACE == "Native Hawaiian and Other Pacific Islander alone" ~ "Native Hawaiian and Other Pacific Islander alone",
-                                   PRACE == "Asian alone" & RAC2P19 %in% asian_top10$RAC2P19~ RAC2P19,
+    RAC2P_equivalent_aapi_group10 = case_when(PRACE == "Native Hawaiian and Other Pacific Islander alone" ~ "Native Hawaiian and Other Pacific Islander alone",
+                                   PRACE == "Asian alone" & RAC2P_equivalent %in% asian_top10$RAC2P_equivalent~ RAC2P_equivalent,
                                    PRACE == "Asian alone"~ "Other Asian subgroups"),
-    RAC2P19_income = case_when(PRACE == "Native Hawaiian and Other Pacific Islander alone" ~ "Native Hawaiian and Other Pacific Islander alone",
-                             RAC2P19 %in% c("Asian Indian alone","Cambodian alone","Chinese, except Taiwanese, alone",
+    RAC2P_equivalent_income = case_when(PRACE == "Native Hawaiian and Other Pacific Islander alone" ~ "Native Hawaiian and Other Pacific Islander alone",
+                             RAC2P_equivalent %in% c("Asian Indian alone","Cambodian alone","Chinese, except Taiwanese, alone",
                                           "Filipino alone","Japanese alone","Korean alone","Laotian alone","Pakistani alone",
-                                          "Taiwanese alone","Thai alone","Vietnamese alone")~RAC2P19,
-                             RAC2P19 == "All combinations of Asian races only"~"Two or more Asian",
+                                          "Taiwanese alone","Thai alone","Vietnamese alone")~RAC2P_equivalent,
+                             RAC2P_equivalent == "All combinations of Asian races only"~"Two or more Asian",
                              TRUE~"Other Asian"))
 
 
@@ -129,7 +139,7 @@ df_pums_renter_aapi <- df_pums_aapi %>% filter(TEN=="Rented")
 
 ## ----- 5. AAPI households (any AAPI member in household) ----- 
 
-# create "RAC2P19_allpersons" variable: get households with at least one AAPI member
+# create "RAC2P_equivalent_allpersons" variable: get households with at least one AAPI member
 race_allpersons <- df_pums_p[['variables']] %>% 
   # filter only AAPI adults
   filter(AGEP >= 15,
@@ -138,9 +148,9 @@ race_allpersons <- df_pums_p[['variables']] %>%
   group_by(SERIALNO) %>%
   summarise(n_aapi = n(),
             n_prace = length(unique(PRACE)),
-            n_RAC2P19 = length(unique(RAC2P19)),
+            n_RAC2P_equivalent = length(unique(RAC2P_equivalent)),
             all_prace = paste(unique(PRACE),collapse = "; "),
-            all_RAC2P19 = paste(unique(RAC2P19),collapse = "; ")) %>%
+            all_RAC2P_equivalent = paste(unique(RAC2P_equivalent),collapse = "; ")) %>%
   ungroup() %>%
   # at least one of AAPI member in household
   mutate(PRACE_allpersons = case_when(# both Asian and PI race in household
@@ -148,16 +158,16 @@ race_allpersons <- df_pums_p[['variables']] %>%
     # at least one AAPI member in household
     all_prace=="Asian alone"~ "Asian",
     all_prace=="Native Hawaiian and Other Pacific Islander alone"~ "Native Hawaiian and Other Pacific Islander"),
-    RAC2P19_allpersons = case_when(# both Asian and PI race in household
+    RAC2P_equivalent_allpersons = case_when(# both Asian and PI race in household
       n_prace>1~"Multiple AAPI races", 
       # multiple asian subgroups in household
-      all_prace == "Asian alone" & n_RAC2P19>1~"Multiple Asian subgroups", 
+      all_prace == "Asian alone" & n_RAC2P_equivalent>1~"Multiple Asian subgroups", 
       # multiple PI subgroups in household
-      all_prace == "Native Hawaiian and Other Pacific Islander alone" & n_RAC2P19>1~"Multiple Native Hawaiian and Other Pacific Islander subgroups",
+      all_prace == "Native Hawaiian and Other Pacific Islander alone" & n_RAC2P_equivalent>1~"Multiple Native Hawaiian and Other Pacific Islander subgroups",
       # at least one AAPI member in household
-      all_prace=="Asian alone"~ all_RAC2P19,
-      all_prace=="Native Hawaiian and Other Pacific Islander alone"~ all_RAC2P19)) %>%
-  select(SERIALNO,PRACE_allpersons,RAC2P19_allpersons)
+      all_prace=="Asian alone"~ all_RAC2P_equivalent,
+      all_prace=="Native Hawaiian and Other Pacific Islander alone"~ all_RAC2P_equivalent)) %>%
+  select(SERIALNO,PRACE_allpersons,RAC2P_equivalent_allpersons)
 
 
 df_pums_aapi_allpersons <- df_pums %>%
@@ -166,7 +176,7 @@ df_pums_aapi_allpersons[['variables']] <- df_pums_aapi_allpersons[['variables']]
   left_join(race_allpersons, by="SERIALNO") %>%
   mutate(
     # grouped race category: top 10 populous Asian subgroups, other Asian races and all Pacific Islander
-    RAC2P19_allpersons_aapi_group10 = case_when(PRACE_allpersons == "Asian" & RAC2P19_allpersons %in% asian_top10$RAC2P19~ RAC2P19_allpersons,
+    RAC2P_equivalent_allpersons_aapi_group10 = case_when(PRACE_allpersons == "Asian" & RAC2P_equivalent_allpersons %in% asian_top10$RAC2P_equivalent~ RAC2P_equivalent_allpersons,
                                               PRACE_allpersons == "Asian"~ "Other Asian subgroups",
                                               TRUE~PRACE_allpersons
     ))
@@ -182,30 +192,30 @@ df_pums_p_aapi_renter_worker <- df_pums_p %>%
          !is.na(SOCP3),
          SERIALNO %in% df_pums_renter_aapi[['variables']]$SERIALNO)
 df_pums_p_aapi_renter_worker[['variables']] <- df_pums_p_aapi_renter_worker[['variables']] %>% 
-  left_join(df_pums_renter_aapi[['variables']] %>% select(SERIALNO,PRACE,RAC2P19,RAC2P19_aapi_group10) %>%
-              rename(RAC2P19_aapi_group10_household = RAC2P19_aapi_group10), 
+  left_join(df_pums_renter_aapi[['variables']] %>% select(SERIALNO,PRACE,RAC2P_equivalent,RAC2P_equivalent_aapi_group10) %>%
+              rename(RAC2P_equivalent_aapi_group10_household = RAC2P_equivalent_aapi_group10), 
             by="SERIALNO", suffix=c("","_houshold"))
 
   
 
 # --- example crosstabs ----
 # total number of households in each subgroup
-hh_count <- psrc_pums_count(df_pums_renter_aapi, group_vars=c("PRACE","RAC2P19")) %>%
-  filter(RAC2P19!="Total")
+hh_count <- psrc_pums_count(df_pums_renter_aapi, group_vars=c("PRACE","RAC2P_equivalent")) %>%
+  filter(RAC2P_equivalent!="Total")
 # job share for renters in entire region and each AAPI subgroup
 job3_region <- df_pums_p %>% filter(AGEP >= 15, !is.na(SOCP3), TEN=="Rented") %>%
   psrc_pums_count(., group_vars=c("SOCP3"))
-job3_by_aapi_race <- psrc_pums_count(df_pums_p_aapi_renter_worker, group_vars=c("PRACE","RAC2P19_aapi_group10_household","SOCP3"))
+job3_by_aapi_race <- psrc_pums_count(df_pums_p_aapi_renter_worker, group_vars=c("PRACE","RAC2P_equivalent_aapi_group10_household","SOCP3"))
 
 # top 5 occupations of renters in entire region and each AAPI subgroup
 job3_region_top_5 <- job3_region %>%
   filter(SOCP3 != "Total") %>%
   arrange(desc(share)) %>%
   top_n(5, share) %>%
-  mutate(RAC2P19_aapi_group10_household = "Region", .after="COUNTY")
+  mutate(RAC2P_equivalent_aapi_group10_household = "Region", .after="COUNTY")
 job3_by_aapi_race_top_5 <- job3_by_aapi_race %>%
   filter(SOCP3 != "Total") %>%
-  group_by(RAC2P19_aapi_group10_household) %>%
+  group_by(RAC2P_equivalent_aapi_group10_household) %>%
   arrange(desc(share), .by_group = TRUE) %>%
   top_n(5, share) %>%
   ungroup() %>%

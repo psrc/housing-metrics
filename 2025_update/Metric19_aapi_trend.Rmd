@@ -11,12 +11,12 @@ source("metric19_aapi_trend.R")
 
 ```{r, include = FALSE, warning=FALSE}
 
-renter <- psrc_pums_count(df_pums_renter_aapi, group_vars=c("PRACE","RAC2P23_aapi_group10","rent_pct_income_30"), rr=TRUE) %>% 
+renter <- psrc_pums_count(df_pums_renter_aapi, group_vars=c("PRACE","RAC2P_equivalent_aapi_group10","rent_pct_income_30"), rr=TRUE) %>% 
     add_row(psrc_pums_count(df_pums_renter, group_vars=c("PRACE", "rent_pct_income_30")) %>% 
-               mutate(RAC2P23_aapi_group10 = "Asian alone", .after="COUNTY")) %>% 
+               mutate(RAC2P_equivalent_aapi_group10 = "Asian alone", .after="COUNTY")) %>% 
     filter(PRACE == "Asian alone") %>% 
     add_row(psrc_pums_count(df_pums_renter, group_vars=c("rent_pct_income_30")) %>%
-           mutate(RAC2P23_aapi_group10 = "Region", .after="COUNTY"))
+           mutate(RAC2P_equivalent_aapi_group10 = "Region", .after="COUNTY"))
 
 
 tenure_prace <- psrc_pums_count(df_pums_renter %>% mutate(PRACE = case_when(PRACE %in% c("Some Other Race alone", "Two or More Races")~"Other",
@@ -43,12 +43,12 @@ This plot displays Asian sub-groups who are cost burdened. This is defined by an
 
 cost_burdened <- renter %>% 
   filter(rent_pct_income_30 == "Greater than 30 percent") %>%
-  select(RAC2P23_aapi_group10, count, count_moe, share, share_moe, reliability) %>% 
-  group_by(RAC2P23_aapi_group10) %>%
+  select(RAC2P_equivalent_aapi_group10, count, count_moe, share, share_moe, reliability) %>% 
+  group_by(RAC2P_equivalent_aapi_group10) %>%
   summarize(across(c(count, count_moe, share, share_moe), sum)) %>% # aggregates all numerical values based on race
   dplyr::mutate(perc = paste0(sprintf("%4.0f", share * 100)))
 
-ggplot(cost_burdened, aes(x=reorder(RAC2P23_aapi_group10, share), y=share, fill=RAC2P23_aapi_group10)) +
+ggplot(cost_burdened, aes(x=reorder(RAC2P_equivalent_aapi_group10, share), y=share, fill=RAC2P_equivalent_aapi_group10)) +
   geom_col()+
   geom_text(aes(y=share, label=scales::percent(share, accuracy = 0.1)), size = 7, hjust=-0.5)+
   geom_errorbar(aes(ymin=share-share_moe, ymax=share+share_moe), width=0.2) +
@@ -93,25 +93,25 @@ library(data.table)
 library(kableExtra)
 
   
-job3_by_asian_alone <- psrc_pums_count(df_pums_p_aapi_renter_worker %>% filter(RAC2P23_aapi_group10_household!="Native Hawaiian and Other Pacific Islander"), group_vars=c("SOCP3")) %>%
+job3_by_asian_alone <- psrc_pums_count(df_pums_p_aapi_renter_worker %>% filter(RAC2P_equivalent_aapi_group10_household!="Native Hawaiian and Other Pacific Islander"), group_vars=c("SOCP3")) %>%
   arrange(desc(count))
 
 
-job3_by_aapi_race <- psrc_pums_count(df_pums_p_aapi_renter_worker, group_vars=c("RAC2P23_aapi_group10_household","SOCP3")) %>%
-  mutate(PRACE="Asian alone", .before="RAC2P23_aapi_group10_household") %>% 
+job3_by_aapi_race <- psrc_pums_count(df_pums_p_aapi_renter_worker, group_vars=c("RAC2P_equivalent_aapi_group10_household","SOCP3")) %>%
+  mutate(PRACE="Asian alone", .before="RAC2P_equivalent_aapi_group10_household") %>% 
   add_row(psrc_pums_count(df_pums_renter_all_race, group_vars=c("PRACE", "SOCP3")) %>%
-            mutate(RAC2P23_aapi_group10_household = "Asian alone", .after="COUNTY")) %>% 
+            mutate(RAC2P_equivalent_aapi_group10_household = "Asian alone", .after="COUNTY")) %>% 
   filter(PRACE == "Asian alone") %>% 
   add_row(psrc_pums_count(df_pums, group_vars=c("SOCP3")) %>%
-           mutate(RAC2P23_aapi_group10_household = "Region", .after="COUNTY"))
+           mutate(RAC2P_equivalent_aapi_group10_household = "Region", .after="COUNTY"))
 
 job_df <- job3_by_aapi_race %>% 
-  group_by(RAC2P23_aapi_group10_household) %>% 
+  group_by(RAC2P_equivalent_aapi_group10_household) %>% 
   filter(SOCP3!="Total") %>%
   slice_max(count, n= 5) %>%
   mutate(occupation = str_c("Occupation_", row_number())) %>% 
   spread(occupation, SOCP3) %>% 
-  select(RAC2P23_aapi_group10_household, 'Occupation_1', 'Occupation_2', 'Occupation_3', 'Occupation_4', 'Occupation_5')   %>%
+  select(RAC2P_equivalent_aapi_group10_household, 'Occupation_1', 'Occupation_2', 'Occupation_3', 'Occupation_4', 'Occupation_5')   %>%
   mutate(across(everything(), as.character)) %>%
   mutate(across(c('Occupation_1'),substr, 5, nchar(Occupation_1))) %>%
   mutate(across(everything(), as.character)) %>%
@@ -127,7 +127,7 @@ job_df <- job3_by_aapi_race %>%
 
 setDT(job_df)
 
-job_df <- job_df[, lapply(.SD, paste0, collapse=""), by=RAC2P23_aapi_group10_household] %>% 
+job_df <- job_df[, lapply(.SD, paste0, collapse=""), by=RAC2P_equivalent_aapi_group10_household] %>% 
   rename_at(1, ~'AAPI Subgroup')
 
 kbl(job_df) %>% 
@@ -145,11 +145,11 @@ kbl(job_df) %>%
 # tbl for AAPI subgroup
 cost_burdened2 <- renter %>% 
   filter(rent_pct_income_30 == "Greater than 30 percent") %>%
-  select(RAC2P23_aapi_group10, count, count_moe, share, share_moe, reliability) %>% 
-  group_by(RAC2P23_aapi_group10) %>%
+  select(RAC2P_equivalent_aapi_group10, count, count_moe, share, share_moe, reliability) %>% 
+  group_by(RAC2P_equivalent_aapi_group10) %>%
   summarize(across(c(count, count_moe, share, share_moe), sum)) %>% # aggregates all numerical values based on race
   dplyr::mutate(Percentage = share * 100) %>%
-  select(RAC2P23_aapi_group10, Percentage) %>% 
+  select(RAC2P_equivalent_aapi_group10, Percentage) %>% 
   arrange(desc(Percentage))
   
   cost_burdened2$Percentage <- round(cost_burdened2$Percentage, 0)
