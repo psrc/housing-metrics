@@ -1,7 +1,7 @@
 # TITLE: Counting Bedrooms Created in New Units over time
 # GEOGRAPHIES: PSRC Region & County
 # DATA SOURCE: 1YR ACS PUMS
-# DATE MODIFIED: 01.28.2024
+# DATE CREATED: 01.28.2024
 # AUTHOR: Eric Clute
 
 library(psrccensus)
@@ -85,8 +85,16 @@ reg_allunits_share <- reg_allunits %>%
          unit_size = factor(unit_size, levels = unit_size_order)) %>%
   arrange(unit_size)
 
-reg_allunits_analysis <- bind_rows(reg_allunits_share, reg_allunits_analysis_reliability)
-rm(reg_allunits, reg_allunits_analysis_reliability, reg_allunits_share)
+reg_allunits_analysis_count <- reg_allunits %>%
+  filter(unit_size != "Total") %>%
+  select(decade, unit_size, count) %>%
+  pivot_wider(names_from = decade, values_from = count) %>%
+  mutate(across(everything(), as.character),
+         unit_size = factor(unit_size, levels = unit_size_order)) %>%
+  arrange(unit_size)
+
+reg_allunits_analysis <- bind_rows(reg_allunits_analysis_count, reg_allunits_share, reg_allunits_analysis_reliability)
+rm(reg_allunits, reg_allunits_analysis_reliability, reg_allunits_share, reg_allunits_analysis_count)
 
 #-------------- Regional Analysis - Unit Size by Decade and Tenure ---------------
 reg_rntr <- psrc_pums_count(pums, decade, group_vars = c("tenure", "decade", "unit_size_rntr"),rr=TRUE)
