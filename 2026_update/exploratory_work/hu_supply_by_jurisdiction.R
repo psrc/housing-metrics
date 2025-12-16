@@ -12,6 +12,9 @@ library(psrchousing)
 export_path <- "J:/Projects/V2050/Housing/Monitoring/2026Update/exploratory_work/hu_supply_by_juris"
 source_info <- c("OFM April 1 Population and Housing Estimates.")
 
+years <- (2024:2025)
+most_current_ofm_vintage <- "2025"
+
 # Function ---------------------
 
 ofm_juris_housing_unit_data <- function(dec = 0) {
@@ -70,7 +73,7 @@ ofm_juris_housing_unit_data <- function(dec = 0) {
                   "total", "total_annual_chg") |>
     dplyr::mutate(geography = stringr::str_remove_all(.data$geography, " County")) |>
     dplyr::arrange(.data$geography, .data$year) |>
-    dplyr::filter(year %in% 2024:2025 ) |>
+    dplyr::filter(year %in% years ) |>
     dplyr::filter(!grepl("Incorporated", geography)) |>
     dplyr::filter(!grepl("^(King|Kitsap|Pierce|Snohomish)$", geography)) |>
     dplyr::filter(!grepl("Enumclaw \\(Pierce\\)", geography)) |> #removed - no housing units on Pierce side of Enumclaw
@@ -100,14 +103,35 @@ hu_targets_juris <- function() {
 
 }
 
-join_ofm_and_targets <- function() {}
+join_ofm_and_targets <- function() {
 
-
-analysis <- hu %>% left_join(targets, by = "geography") %>%
+df <- hu %>% left_join(targets, by = "geography") %>%
   mutate(perc_total_built = change_total / Growth_Total)
+}
+
+ofm_annexation_data <- function() {
+  
+}
+
+# TEST CODE for OFM annexation function
+
+# OFM annexation file
+ofm_annexation_link = "https://ofm.wa.gov/wp-content/uploads/sites/default/files/public/dataresearch/pop/annex/annex_detail.xlsx"
+
+# Cleanup
+print(stringr::str_glue("Processing OFM annexation data"))
+
+ofm_annex_data <- dplyr::as_tibble(openxlsx::read.xlsx(ofm_annexation_link, detectDates = FALSE, skipEmptyRows = TRUE, startRow = 4, colNames = TRUE, sheet = "Annexations")) |>
+dplyr::filter(County.Name %in% c("King","Kitsap","Pierce","Snohomish"), `OFM.April.1.Estimate.Year` == most_current_ofm_vintage)|>
+dplyr::mutate(dplyr::across(.cols = ends_with(".Date"), ~ as.Date(.x, origin = "1899-12-30"))) |>
+dplyr::select(County.Name, City.Name, `Area.(Acres)`, Effective.Date, OFM.Approval.Date, OFM.April.1.Estimate.Year, Total.Population, Total.Housing.Units)
+
+
+
 
 # Analysis ------------------
 
 hu_raw <- ofm_juris_housing_unit_data()
 hu <- ofm_juris_housing_unit_change()
 targets <- hu_targets_juris()
+analysis <- join_ofm_and_targets()
