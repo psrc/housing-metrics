@@ -1,6 +1,5 @@
 # Exploration of tracking housing supply by jurisdiction
 # Geographies: Jurisdiction
-# Data Vintage: 2025 OFM April 1 estimates
 # Created By: Eric Clute
 
 # Assumptions ---------------------
@@ -13,9 +12,10 @@ export_path <- "J:/Projects/V2050/Housing/Monitoring/2026Update/exploratory_work
 source_info <- c("OFM April 1 Population and Housing Estimates.")
 
 years <- (2024:2025)
-most_current_ofm_vintage <- "2025"
+annex_years <- (2025:2025) #Should be 1 less than "years" defined above. EX: year = 2020:2025 and annex_years = 2021:2025
+multi_county_juris <- c("Auburn", "Bothell", "Milton", "Pacific", "Enumclaw")
 
-# Function ---------------------
+# Functions ---------------------
 
 ofm_juris_housing_unit_data <- function(dec = 0) {
   
@@ -61,11 +61,8 @@ ofm_juris_housing_unit_data <- function(dec = 0) {
     dplyr::group_by(.data$geography) |>
     dplyr::mutate(total_annual_chg = round(.data$total - dplyr::lag(.data$total), dec)) |>
     dplyr::mutate(sf_chg = round(.data$sf - dplyr::lag(.data$sf), dec)) |>
-#    dplyr::mutate(sf_per = .data$sf_chg / .data$total_chg) |>
     dplyr::mutate(mf_chg = round(.data$mf - dplyr::lag(.data$mf), dec)) |>
-#    dplyr::mutate(mf_per = .data$mf_chg / .data$total_chg) |>
     dplyr::mutate(mh_chg = round(.data$mh - dplyr::lag(.data$mh), dec)) |>
-#    dplyr::mutate(mh_per = .data$mh_chg / .data$total_chg) |>
     dplyr::select("year", "geography",
                   "sf", "sf_chg",# "sf_per",
                   "mf", "mf_chg",# "mf_per",
@@ -76,7 +73,8 @@ ofm_juris_housing_unit_data <- function(dec = 0) {
     dplyr::filter(year %in% years ) |>
     dplyr::filter(!grepl("Incorporated", geography)) |>
     dplyr::filter(!grepl("^(King|Kitsap|Pierce|Snohomish)$", geography)) |>
-    dplyr::filter(!grepl("Enumclaw \\(Pierce\\)", geography)) |> #removed - no housing units on Pierce side of Enumclaw
+    dplyr::filter(!grepl("Enumclaw \\(Pierce\\)", geography)) |> #removed - no housing targets for Pierce side of Enumclaw
+#    dplyr::filter(!grepl("Pacific \\(Pierce\\)", geography)) |> #removed - no housing units on Pierce side of Pacific
     dplyr::mutate(geography = if_else(str_starts(geography, "Enumclaw"),str_replace(geography, " \\(.*\\)", ""), geography))
   
   return(tbl)
@@ -86,7 +84,7 @@ ofm_juris_housing_unit_change <- function() {
   # Crunch change in housing units over time
   hu <- hu_raw %>% dplyr::select(year, geography, total) %>%
     group_by(geography) %>%
-    summarise(first_total = total[which.min(year)], last_total = total[which.max(year)], change_total = last_total - first_total, years = paste(min(year), max(year), sep = "-")) %>%
+    summarise(first_total = total[which.min(year)], last_total = total[which.max(year)], hu_change = last_total - first_total, years = paste(min(year), max(year), sep = "-")) %>%
     ungroup()
 }
 
@@ -99,39 +97,54 @@ hu_targets_juris <- function() {
   
   # Clean up
   targets <- targets_raw %>% dplyr::select(Jurisdiction, Growth_Total) %>%
-    rename(geography = Jurisdiction)
+    rename(geography = Jurisdiction, growth_target = Growth_Total)
 
-}
-
-join_ofm_and_targets <- function() {
-
-df <- hu %>% left_join(targets, by = "geography") %>%
-  mutate(perc_total_built = change_total / Growth_Total)
 }
 
 ofm_annexation_data <- function() {
+  # OFM annexation file
+  ofm_annexation_link = "https://ofm.wa.gov/wp-content/uploads/sites/default/files/public/dataresearch/pop/annex/annex_detail.xlsx"
+  
+  # Formatting
+  print(stringr::str_glue("Processing OFM annexation data"))
+  
+  ofm_annex_data_raw <- dplyr::as_tibble(openxlsx::read.xlsx(ofm_annexation_link, detectDates = FALSE, skipEmptyRows = TRUE, startRow = 4, colNames = TRUE, sheet = "Annexations"))
+  
+  ofm_annex_data <- ofm_annex_data_raw |>
+    dplyr::filter(County.Name %in% c("King","Kitsap","Pierce","Snohomish"), `OFM.April.1.Estimate.Year` %in% annex_years)|>
+    dplyr::mutate(dplyr::across(.cols = ends_with(".Date"), ~ as.Date(.x, origin = "1899-12-30"))) |>
+    dplyr::group_by(City.Name) |>
+    
+    # Locate any multicounty jurisdictions, add county name to city name ex: Auburn (King)
+    dplyr::mutate(is_multi_county = City.Name %in% multi_county_juris, City.Name = dplyr::if_else(is_multi_county, stringr::str_glue("{City.Name} ({County.Name})"), City.Name)) |>
+    
+    # Cleanup
+    dplyr::select(City.Name, Total.Housing.Units) |>
+    rename(annexed_hu = "Total.Housing.Units", geography = "City.Name") |>
+    dplyr::group_by(geography) |>
+    dplyr::summarise(annexed_hu = sum(annexed_hu, na.rm = TRUE), .groups = "drop")
   
 }
 
-# TEST CODE for OFM annexation function
-
-# OFM annexation file
-ofm_annexation_link = "https://ofm.wa.gov/wp-content/uploads/sites/default/files/public/dataresearch/pop/annex/annex_detail.xlsx"
-
-# Cleanup
-print(stringr::str_glue("Processing OFM annexation data"))
-
-ofm_annex_data <- dplyr::as_tibble(openxlsx::read.xlsx(ofm_annexation_link, detectDates = FALSE, skipEmptyRows = TRUE, startRow = 4, colNames = TRUE, sheet = "Annexations")) |>
-dplyr::filter(County.Name %in% c("King","Kitsap","Pierce","Snohomish"), `OFM.April.1.Estimate.Year` == most_current_ofm_vintage)|>
-dplyr::mutate(dplyr::across(.cols = ends_with(".Date"), ~ as.Date(.x, origin = "1899-12-30"))) |>
-dplyr::select(County.Name, City.Name, `Area.(Acres)`, Effective.Date, OFM.Approval.Date, OFM.April.1.Estimate.Year, Total.Population, Total.Housing.Units)
-
-
-
+join_ofm_and_targets <- function() {
+  
+  hu <- hu |> 
+    left_join(targets, by = "geography") |>
+    left_join(annex, by = "geography") |>
+    mutate(hu_change_and_annexations = hu_change - dplyr::coalesce(annexed_hu, 0),
+      perc_total_built = hu_change_and_annexations / growth_target) |>
+    select(geography, years, growth_target, hu_change_and_annexations, perc_total_built)
+}
 
 # Analysis ------------------
 
+# Clean data
 hu_raw <- ofm_juris_housing_unit_data()
-hu <- ofm_juris_housing_unit_change()
 targets <- hu_targets_juris()
+annex <- ofm_annexation_data()
+
+# Calculate change in units - OFM housing unit data
+hu <- ofm_juris_housing_unit_change()
+
+# Join and analyze
 analysis <- join_ofm_and_targets()
