@@ -4,15 +4,12 @@
 
 # Assumptions ---------------------
 library(dplyr)
-library(openxlsx)
 library(tidyverse)
 library(psrchousing)
+library(openxlsx)
 
 export_path <- "J:/Projects/V2050/Housing/Monitoring/2026Update/exploratory_work/hu_supply_by_juris"
 source_info <- c("OFM April 1 Population and Housing Estimates.")
-
-years <- (2024:2025)
-annex_years <- (2025:2025) #Should be 1 less than "years" defined above. EX: year = 2020:2025 and annex_years = 2021:2025
 multi_county_juris <- c("Auburn", "Bothell", "Milton", "Pacific", "Enumclaw")
 
 # Functions ---------------------
@@ -68,13 +65,12 @@ ofm_juris_housing_unit_data <- function(dec = 0) {
                   "mf", "mf_chg",# "mf_per",
                   "mh", "mh_chg",# "mh_per",
                   "total", "total_annual_chg") |>
-    dplyr::mutate(geography = stringr::str_remove_all(.data$geography, " County")) |>
     dplyr::arrange(.data$geography, .data$year) |>
     dplyr::filter(year %in% years ) |>
     dplyr::filter(!grepl("Incorporated", geography)) |>
-    dplyr::filter(!grepl("^(King|Kitsap|Pierce|Snohomish)$", geography)) |>
+    dplyr::filter(!grepl("^(King|Kitsap|Pierce|Snohomish) County$", geography)) |>
     dplyr::filter(!grepl("Enumclaw \\(Pierce\\)", geography)) |> #removed - no housing targets for Pierce side of Enumclaw
-#    dplyr::filter(!grepl("Pacific \\(Pierce\\)", geography)) |> #removed - no housing units on Pierce side of Pacific
+#   dplyr::filter(!grepl("Pacific \\(Pierce\\)", geography)) |> #removed - no housing units on Pierce side of Pacific
     dplyr::mutate(geography = if_else(str_starts(geography, "Enumclaw"),str_replace(geography, " \\(.*\\)", ""), geography))
   
   return(tbl)
@@ -86,19 +82,6 @@ ofm_juris_housing_unit_change <- function() {
     group_by(geography) %>%
     summarise(first_total = total[which.min(year)], last_total = total[which.max(year)], hu_change = last_total - first_total, years = paste(min(year), max(year), sep = "-")) %>%
     ungroup()
-}
-
-hu_targets_juris <- function() {
-  # File location
-  targets_data <- "J:/Projects/V2050/Housing/Monitoring/2026Update/exploratory_work/hu_supply_by_juris/Regional Housing Need by Income Band.xlsx"
-  
-  # Read in housing targets data
-  targets_raw <- read.xlsx(targets_data, sheet = "Combined")
-  
-  # Clean up
-  targets <- targets_raw %>% dplyr::select(Jurisdiction, Growth_Total) %>%
-    rename(geography = Jurisdiction, growth_target = Growth_Total)
-
 }
 
 ofm_annexation_data <- function() {
@@ -126,17 +109,40 @@ ofm_annexation_data <- function() {
   
 }
 
-join_ofm_and_targets <- function() {
+hu_targets_juris <- function() {
+  # File location
+  targets_data <- "J:/Projects/V2050/Housing/Monitoring/2026Update/exploratory_work/hu_supply_by_juris/Regional Housing Need by Income Band.xlsx"
+  
+  # Read in housing targets data
+  targets_raw <- read.xlsx(targets_data, sheet = "Combined")
+  
+  # Clean up
+  targets <- targets_raw %>% dplyr::select(Jurisdiction, Growth_Total) %>%
+    rename(geography = Jurisdiction, growth_target = Growth_Total)
+
+}
+
+join_data <- function() {
+  year_label <- paste0(min(years), "-", max(years))
+  n_years <- max(years) - min(years)
+  
+  net_col <- paste0(year_label, "_net_hu")
+  annual_col <- paste0(year_label, "_annualized_net_hu")
   
   hu <- hu |> 
     left_join(targets, by = "geography") |>
     left_join(annex, by = "geography") |>
-    mutate(hu_change_and_annexations = hu_change - dplyr::coalesce(annexed_hu, 0),
-      perc_total_built = hu_change_and_annexations / growth_target) |>
-    select(geography, years, growth_target, hu_change_and_annexations, perc_total_built)
+    dplyr::mutate("{net_col}" := hu_change - dplyr::coalesce(annexed_hu, 0),
+      "{annual_col}" := .data[[net_col]] / n_years,
+      perc_total_built = .data[[net_col]] / growth_target
+    ) |>
+    select(geography, growth_target, dplyr::ends_with("_net_hu"), perc_total_built, dplyr::ends_with("_annualized_net_hu"))
 }
 
-# Analysis ------------------
+# Planning Period Analysis ------------------
+
+years <- (2024:2025)
+annex_years <- (2025:2025) #Should be 1 less than "years" defined above. EX: year = 2020:2025 and annex_years = 2021:2025
 
 # Clean data
 hu_raw <- ofm_juris_housing_unit_data()
@@ -147,4 +153,26 @@ annex <- ofm_annexation_data()
 hu <- ofm_juris_housing_unit_change()
 
 # Join and analyze
-analysis <- join_ofm_and_targets()
+analysis <- join_data()
+
+# 5-Yr Base Comparison Analysis ------------------
+
+years <- (2020:2025)
+annex_years <- (2021:2025) #Should be 1 less than "years" defined above. EX: year = 2020:2025 and annex_years = 2021:2025
+
+# Clean data
+hu_raw <- ofm_juris_housing_unit_data()
+annex <- ofm_annexation_data()
+
+# Calculate change in units - OFM housing unit data
+hu <- ofm_juris_housing_unit_change()
+
+# Join and analyze
+comparison_5yr <- join_data()
+
+# Clean up and join to main analysis
+comparison_5yr <- comparison_5yr |> dplyr::select(geography, dplyr::ends_with("_annualized_net_hu"))
+analysis <- analysis |> dplyr::left_join(comparison_5yr, by = "geography")
+
+# Export ------------------
+openxlsx::write.xlsx(analysis, file = file.path(export_path, "test_analysis_tbl.xlsx"), rowNames = FALSE)
