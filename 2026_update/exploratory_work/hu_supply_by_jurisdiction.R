@@ -117,8 +117,10 @@ hu_targets_juris <- function() {
   targets_raw <- read.xlsx(targets_data, sheet = "Combined")
   
   # Clean up
-  targets <- targets_raw %>% dplyr::select(Jurisdiction, Growth_Total) %>%
-    rename(geography = Jurisdiction, growth_target = Growth_Total)
+  targets <- targets_raw |> 
+    dplyr::select(Jurisdiction, Growth_Total) |>
+    rename(geography = Jurisdiction, growth_target = Growth_Total) |>
+    mutate(annualized_growth_target = growth_target/20)
 
 }
 
@@ -136,7 +138,7 @@ join_data <- function() {
       "{annual_col}" := .data[[net_col]] / n_years,
       perc_total_built = .data[[net_col]] / growth_target
     ) |>
-    select(geography, growth_target, dplyr::ends_with("_net_hu"), perc_total_built, dplyr::ends_with("_annualized_net_hu"))
+    select(geography, growth_target, annualized_growth_target, dplyr::ends_with("_net_hu"), perc_total_built, dplyr::ends_with("_annualized_net_hu"))
 }
 
 # Planning Period Analysis ------------------
