@@ -47,6 +47,7 @@ ofm_juris_housing_unit_data <- function(dec = 0) {
   print(stringr::str_glue("Summarizing OFM post-censal housing estimates from 1980 to present for PSRC region"))
   region <- ofm_data |>
     dplyr::group_by(.data$year, .data$variable) |>
+    dplyr::filter(geography %in% c("King County", "Kitsap County", "Pierce County", "Snohomish County")) |>
     dplyr::summarise(estimate = sum(.data$estimate)) |>
     dplyr::as_tibble() |>
     dplyr::mutate(geography = "Region")
@@ -56,10 +57,10 @@ ofm_juris_housing_unit_data <- function(dec = 0) {
   tbl <- dplyr::bind_rows(ofm_data, region) |>
     tidyr::pivot_wider(names_from = "variable", values_from = "estimate") |>
     dplyr::group_by(.data$geography) |>
-    dplyr::mutate(total_annual_chg = round(.data$total - dplyr::lag(.data$total), dec)) |>
-    dplyr::mutate(sf_chg = round(.data$sf - dplyr::lag(.data$sf), dec)) |>
-    dplyr::mutate(mf_chg = round(.data$mf - dplyr::lag(.data$mf), dec)) |>
-    dplyr::mutate(mh_chg = round(.data$mh - dplyr::lag(.data$mh), dec)) |>
+    dplyr::mutate(total_annual_chg = round(.data$total - dplyr::lag(.data$total))) |>
+    dplyr::mutate(sf_chg = round(.data$sf - dplyr::lag(.data$sf))) |>
+    dplyr::mutate(mf_chg = round(.data$mf - dplyr::lag(.data$mf))) |>
+    dplyr::mutate(mh_chg = round(.data$mh - dplyr::lag(.data$mh))) |>
     dplyr::select("year", "geography",
                   "sf", "sf_chg",# "sf_per",
                   "mf", "mf_chg",# "mf_per",
@@ -118,9 +119,11 @@ hu_targets_juris <- function() {
   
   # Clean up
   targets <- targets_raw |> 
-    dplyr::select(Jurisdiction, Growth_Total) |>
+    dplyr::select(Jurisdiction, County, Growth_Total) |>
     rename(geography = Jurisdiction, growth_target = Growth_Total) |>
-    mutate(annualized_growth_target = growth_target/20)
+    mutate(annualized_growth_target = round(if_else(County == "King",
+                                                    growth_target / 25,
+                                                    growth_target / 24),3))
 
 }
 
@@ -130,18 +133,19 @@ join_data <- function() {
   
   net_col <- paste0(year_label, "_net_hu")
   annual_col <- paste0(year_label, "_annualized_net_hu")
+  perc_col <- paste0(year_label, "_perc_of_target")
   
   hu <- hu |> 
     left_join(targets, by = "geography") |>
     left_join(annex, by = "geography") |>
     dplyr::mutate("{net_col}" := hu_change - dplyr::coalesce(annexed_hu, 0),
       "{annual_col}" := .data[[net_col]] / n_years,
-      perc_total_built = .data[[net_col]] / growth_target
-    ) |>
-    select(geography, growth_target, annualized_growth_target, dplyr::ends_with("_net_hu"), perc_total_built, dplyr::ends_with("_annualized_net_hu"))
+      "{perc_col}" := .data[[net_col]] / growth_target
+    )# |>
+   # select(geography, growth_target, annualized_growth_target, dplyr::ends_with("_net_hu"), dplyr::ends_with("_perc_of_target"), dplyr::ends_with("_annualized_net_hu"))
 }
 
-# Planning Period Analysis ------------------
+# Most Recent Period Analysis ------------------
 
 years <- (2024:2025)
 annex_years <- (2025:2025) #Should be 1 less than "years" defined above. EX: year = 2020:2025 and annex_years = 2021:2025
@@ -155,26 +159,23 @@ annex <- ofm_annexation_data()
 hu <- ofm_juris_housing_unit_change()
 
 # Join and analyze
-analysis <- join_data()
+one_year <- join_data()
 
-# 5-Yr Base Comparison Analysis ------------------
+# Since Targets were Adopted Analysis ------------------
 
 years <- (2020:2025)
 annex_years <- (2021:2025) #Should be 1 less than "years" defined above. EX: year = 2020:2025 and annex_years = 2021:2025
 
 # Clean data
 hu_raw <- ofm_juris_housing_unit_data()
+targets <- hu_targets_juris()
 annex <- ofm_annexation_data()
 
 # Calculate change in units - OFM housing unit data
 hu <- ofm_juris_housing_unit_change()
 
 # Join and analyze
-comparison_5yr <- join_data()
-
-# Clean up and join to main analysis
-comparison_5yr <- comparison_5yr |> dplyr::select(geography, dplyr::ends_with("_annualized_net_hu"))
-analysis <- analysis |> dplyr::left_join(comparison_5yr, by = "geography")
+multi_year <- join_data()
 
 # Export ------------------
-openxlsx::write.xlsx(analysis, file = file.path(export_path, "test_analysis_tbl.xlsx"), rowNames = FALSE)
+openxlsx::write.xlsx(multi_year, file = file.path(export_path, "export_analysis_tbl.xlsx"), rowNames = FALSE)
