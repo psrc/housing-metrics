@@ -121,9 +121,23 @@ hu_targets_juris <- function() {
   targets <- targets_raw |> 
     dplyr::select(Jurisdiction, County, Growth_Total) |>
     rename(geography = Jurisdiction, growth_target = Growth_Total) |>
-    mutate(annualized_growth_target = round(if_else(County == "King",
-                                                    growth_target / 25,
-                                                    growth_target / 24),3))
+    
+    mutate(base_annualized = dplyr::if_else(County == "King",
+                                                   growth_target / 25,
+                                                   growth_target / 24))|>
+    
+    mutate(annualized_growth_target = dplyr::case_when(
+      
+             # Special case: regional row
+             geography == "Region" & (is.na(County) | County == "") ~
+               sum(base_annualized[County == "King"], na.rm = TRUE) +
+               sum(base_annualized[County != "King" & !is.na(County)], na.rm = TRUE),
+             
+             # All normal rows
+             TRUE ~ base_annualized)) |>
+    mutate(annualized_growth_target = round(annualized_growth_target, 1)) |>
+  
+    dplyr::select(-base_annualized)
 
 }
 
@@ -140,7 +154,7 @@ join_data <- function() {
     left_join(annex, by = "geography") |>
     dplyr::mutate("{net_col}" := hu_change - dplyr::coalesce(annexed_hu, 0),
       "{annual_col}" := .data[[net_col]] / n_years,
-      "{perc_col}" := .data[[net_col]] / growth_target
+      "{perc_col}" := .data[[annual_col]] / annualized_growth_target *100
     )# |>
    # select(geography, growth_target, annualized_growth_target, dplyr::ends_with("_net_hu"), dplyr::ends_with("_perc_of_target"), dplyr::ends_with("_annualized_net_hu"))
 }
