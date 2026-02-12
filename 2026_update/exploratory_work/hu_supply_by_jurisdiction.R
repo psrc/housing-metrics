@@ -57,6 +57,11 @@ ofm_juris_housing_unit_data <- function(dec = 0) {
   tbl <- dplyr::bind_rows(ofm_data, region) |>
     tidyr::pivot_wider(names_from = "variable", values_from = "estimate") |>
     dplyr::group_by(.data$geography) |>
+    
+    #clean up South Prairie data - OFM confirms that 112 RV park units are now categorized as mobile homes            #In 2020 population was adjusted, housing units not corrected until 2022. 
+    dplyr::mutate(total = if_else(geography == "South Prairie" & year %in% c(2020, 2021), total + 112, total),
+                  mh = if_else(geography == "South Prairie" & year %in% c(2020, 2021), mh + 112, mh)) |>
+    
     dplyr::mutate(total_annual_chg = round(.data$total - dplyr::lag(.data$total))) |>
     dplyr::mutate(sf_chg = round(.data$sf - dplyr::lag(.data$sf))) |>
     dplyr::mutate(mf_chg = round(.data$mf - dplyr::lag(.data$mf))) |>
@@ -119,8 +124,8 @@ hu_targets_juris <- function() {
   
   # Clean up
   targets <- targets_raw |> 
-    dplyr::select(Jurisdiction, County, Growth_Total) |>
-    rename(geography = Jurisdiction, growth_target = Growth_Total) |>
+    dplyr::select(Jurisdiction, County, Regional.Geography, Growth_Total) |>
+    rename(geography = Jurisdiction, growth_target = Growth_Total, type = Regional.Geography) |>
     
     mutate(base_annualized = dplyr::if_else(County == "King",
                                                    growth_target / 25,
