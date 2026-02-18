@@ -1,0 +1,130 @@
+---
+title: "Housing Permits Charts"
+author: "Kristin Mitchell"
+date: "2025-02-17"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+zoo is a library to calculate the rolling averages
+```{r}
+library(readxl)
+library(dplyr)
+library(zoo)
+library(ggplot2)
+library(openxlsx)
+library(stringr)
+```
+
+
+First run census_permits_data_pull.Rmd to create the excel file with a table. 
+
+Read in the excel table:
+```{r}
+permits_15_df<-read_excel('census_bps_monthly_2015_Oct2025.xlsx')
+
+```
+
+Combine Seattle and Bremerton MSA. Also calculate 3-month rolling averages.
+
+```{r}
+total_df<- permits_15_df%>%group_by(Month)%>%
+           summarise(sum_Total=sum(Total),
+                     sum_1Unit=sum(`1 Unit`))
+  
+
+total_df_3mth<-total_df%>%
+  mutate(multifamily=sum_Total-sum_1Unit)%>%
+  mutate(move_tot3_total=rollapply(sum_Total, 3, sum, align='right', fill=NA),
+         move_tot3_sf=rollapply(sum_1Unit, 3, sum, align='right', fill=NA),
+         move_tot3_mf=rollapply(multifamily, 3, sum, align='right', fill=NA))%>%
+  mutate(month_format=paste(substr(Month,1,4), substr(Month,5,6), sep='-'))
+
+total_df_3mth_03 <- total_df_3mth %>%
+  filter(str_detect(Month, regex("03", ignore_case = TRUE)))
+
+total_df_3mth_03 <- total_df_3mth_03[,c(1,2,5,6,7,8)]
+
+total_df_3mth_06 <- total_df_3mth %>%
+  filter(str_detect(Month, regex("06", ignore_case = TRUE)))
+
+total_df_3mth_06 <- total_df_3mth_06[,c(1,2,5,6,7,8)]
+
+total_df_3mth_09 <- total_df_3mth %>%
+  filter(str_detect(Month, regex("09", ignore_case = TRUE)))
+
+total_df_3mth_09 <- total_df_3mth_09[,c(1,2,5,6,7,8)]
+
+total_df_3mth_12 <- total_df_3mth %>%
+  filter(str_detect(Month, regex("12", ignore_case = TRUE)))
+
+total_df_3mth_12 <- total_df_3mth_12[,c(1,2,5,6,7,8)]
+
+all <- rbind(total_df_3mth_03, total_df_3mth_06, total_df_3mth_09, total_df_3mth_12)
+
+#write.xlsx(all, 'census_bps_quarterly.xlsx')
+
+```
+
+```{r}
+housing_plot_q<-ggplot(all) +
+  geom_bar(aes(x=month_format, y=move_tot3_total,fill='Total'), stat="identity")+
+  geom_line(aes(x=month_format, y=move_tot3_sf,group =1, color='Single family detached & attached'),stat="identity")+
+  geom_line(aes(x=month_format, y=move_tot3_mf, color="Multifamily 2+ units",group=2),stat="identity",)+
+    scale_color_manual(values=c("#F05A28","#91268F"))+
+  scale_fill_manual(values=c("#A9D46E"))+
+  theme(axis.title.x=element_blank(),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.title.y=element_blank(),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+       panel.background = element_blank(), axis.line = element_line(colour = "black"))+
+  theme(legend.position = "bottom",
+        legend.title = element_blank())+
+  labs(title="Permitted Housing Units, Central Puget Sound \n (Quarterly Totals)")
+
+housing_plot_q
+    
+```
+
+## Plot Three Month Average Plot
+
+```{r}
+total_df<- permits_15_df%>%group_by(Month)%>%
+           summarise(sum_Total=sum(Total),
+                     sum_1Unit=sum(`1 Unit`))
+  
+
+total_df_3mth<-total_df%>%
+  mutate(multifamily=sum_Total-sum_1Unit)%>%
+  mutate(move_ave3_total=rollapply(sum_Total, 3, mean, align='right', fill=NA),
+         move_ave3_sf=rollapply(sum_1Unit, 3, mean, align='right', fill=NA),
+         move_ave3_mf=rollapply(multifamily, 3, mean, align='right', fill=NA))%>%
+  mutate(month_format=paste(substr(Month,1,4), substr(Month,5,6), sep='-'))
+```
+
+```{r}
+housing_plot<-ggplot(total_df_3mth) +
+  geom_bar(aes(x=month_format, y=move_ave3_total,fill='Total'), stat="identity")+
+  geom_line(aes(x=month_format, y=move_ave3_sf,group =1, color='Single family detached & attached'),stat="identity")+
+  geom_line(aes(x=month_format, y=move_ave3_mf, color="Multifamily 2+ units",group=2),stat="identity",)+
+    scale_color_manual(values=c("#F05A28","#91268F"))+
+  scale_fill_manual(values=c("#A9D46E"))+
+  theme(axis.title.x=element_blank(),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.title.y=element_blank(),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+       panel.background = element_blank(), axis.line = element_line(colour = "black"))+
+  theme(legend.position = "bottom",
+        legend.title = element_blank())+
+  labs(title="Permitted Housing Units, Central Puget Sound \n (3 month average)")
+
+housing_plot
+    
+```
+
+
+housing_plot
+
