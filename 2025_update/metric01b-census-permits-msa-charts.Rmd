@@ -69,6 +69,32 @@ all <- rbind(total_df_3mth_03, total_df_3mth_06, total_df_3mth_09, total_df_3mth
 
 ```
 
+Yearly & Monthly Avgs - Crunched by Eric Clute for data request
+
+```{r}
+yrly_and_mnthly_avgs <- permits_15_df %>%
+  mutate(year = substr(Month, 1, 4)) %>%
+  group_by(year, Month) %>%
+  summarise(sum_Total=sum(Total),
+            sum_1Unit=sum(`1 Unit`)) %>%
+  mutate(multifamily = sum_Total-sum_1Unit) %>%
+  
+  # yearly and monthly avg totals
+  group_by(year) %>%
+  summarise(yearly_total = sum(sum_Total, na.rm = TRUE),
+            yearly_singlefamily = sum(sum_1Unit, na.rm = TRUE),
+            yearly_multifamily = sum(multifamily, na.rm = TRUE),
+            
+             months = if_else(first(year) == "2025", 10, 12), # 2025 data thru Oct, divide by 10 for monthly data
+            
+            avg_monthly_total = yearly_total / months,
+            avg_monthly_singlefamily = yearly_singlefamily / months,
+            avg_monthly_multifamily = yearly_multifamily / months,
+    .groups = "drop")
+
+```
+
+
 ```{r}
 housing_plot_q<-ggplot(all) +
   geom_bar(aes(x=month_format, y=move_tot3_total,fill='Total'), stat="identity")+
