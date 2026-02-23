@@ -25,11 +25,11 @@ rm(coc_major_city_lookup, coc_region_lookup)
 
 hud_data <- map_dfr(data_years, function(yr) {
   print(str_glue("Processing PIT: {yr}"))
-  df<- dplyr::as_tibble(openxlsx::read.xlsx(pit_path, sheet = as.character(yr), detectDates = FALSE, skipEmptyRows = TRUE, colNames = TRUE)) |>
+  df <- dplyr::as_tibble(openxlsx::read.xlsx(pit_path, sheet = as.character(yr), detectDates = FALSE, skipEmptyRows = TRUE, colNames = TRUE)) |>
   as_tibble() |>
   mutate(year = yr) |>
     filter(CoC.Number %in% pull(coc_lookup, CoC.Number))
-  
+
   df <- df |>
     mutate(across(
       c(Overall.Homeless,
@@ -54,7 +54,7 @@ hud_data <- map_dfr(data_years, function(yr) {
       as.numeric
     ))
   
-  df |>
+  df <- df |>
     select(
       year,
       coc_num = CoC.Number,
@@ -98,6 +98,49 @@ hud_data <- map_dfr(data_years, function(yr) {
          unsheltered_share_white = unsheltered_white/unsheltered,
          unsheltered_share_multiracial = unsheltered_multiracial/unsheltered) |>
   filter(count_type == "Sheltered and Unsheltered Count")
+  
+  df <- df |> #Change order of final output
+    select(year,
+           coc_num,
+           coc_name,
+           
+           total,
+           sheltered,
+           unsheltered,
+           unsheltered_share_total,
+           
+           total_hisp,
+           total_aian,
+           total_asian,
+           total_black,
+           total_nhpi,
+           total_white,
+           total_multiracial,
+           
+           unsheltered_hisp,
+           unsheltered_aian,
+           unsheltered_asian,
+           unsheltered_black,
+           unsheltered_nhpi,
+           unsheltered_white,
+           unsheltered_multiracial,
+           
+           homeless_share_hisp,
+           unsheltered_share_hisp,
+           homeless_share_aian,
+           unsheltered_share_aian,
+           homeless_share_asian,
+           unsheltered_share_asian,
+           homeless_share_black,
+           unsheltered_share_black,
+           homeless_share_nhpi,
+           unsheltered_share_nhpi,
+           homeless_share_white,
+           unsheltered_share_white,
+           homeless_share_multiracial,
+           unsheltered_share_multiracial
+      
+    )
 })
 
 # Major city comparison, snapshot

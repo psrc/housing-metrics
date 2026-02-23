@@ -76,7 +76,8 @@ yrly_and_mnthly_avgs <- permits_15_df %>%
   mutate(year = substr(Month, 1, 4)) %>%
   group_by(year, Month) %>%
   summarise(sum_Total=sum(Total),
-            sum_1Unit=sum(`1 Unit`)) %>%
+            sum_1Unit=sum(`1 Unit`),
+            .groups = "drop_last") %>%
   mutate(multifamily = sum_Total-sum_1Unit) %>%
   
   # yearly and monthly avg totals
@@ -90,7 +91,7 @@ yrly_and_mnthly_avgs <- permits_15_df %>%
             avg_monthly_total = yearly_total / months,
             avg_monthly_singlefamily = yearly_singlefamily / months,
             avg_monthly_multifamily = yearly_multifamily / months,
-    .groups = "drop")
+    .groups = "drop_last")
 
 ```
 
