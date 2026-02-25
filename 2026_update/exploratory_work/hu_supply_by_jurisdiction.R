@@ -140,7 +140,8 @@ hu_targets_juris <- function() {
              
              # All normal rows
              TRUE ~ base_annualized)) |>
-    mutate(annualized_growth_target = round(annualized_growth_target, 1)) |>
+    mutate(annualized_growth_target = round(annualized_growth_target, 1),
+           type = factor(dplyr::coalesce(type, "Region"), levels = c("Region", "Metro", "Core", "HCT", "C+T", "UU"))) |>
   
     dplyr::select(-base_annualized)
 
@@ -159,9 +160,9 @@ join_data <- function() {
     left_join(annex, by = "geography") |>
     dplyr::mutate("{net_col}" := hu_change - dplyr::coalesce(annexed_hu, 0),
       "{annual_col}" := .data[[net_col]] / n_years,
-      "{perc_col}" := .data[[annual_col]] / annualized_growth_target *100
-    )# |>
-   # select(geography, growth_target, annualized_growth_target, dplyr::ends_with("_net_hu"), dplyr::ends_with("_perc_of_target"), dplyr::ends_with("_annualized_net_hu"))
+      "{perc_col}" := .data[[net_col]] / growth_target)|>
+    select(geography, type, growth_target, dplyr::matches("\\d+_net_hu$"), dplyr::ends_with("_perc_of_target")) |>
+    arrange(type, desc(.data[[perc_col]]))
 }
 
 # Most Recent Period Analysis ------------------
