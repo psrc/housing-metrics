@@ -12,8 +12,9 @@ user_dir <- Sys.getenv("USERPROFILE")
 file_loc <- file.path(user_dir, "github/housing-metrics/2026_update/exploratory_work")
 pit_path <- file.path(file_loc, "2007-2024-PIT-Counts-by-CoC.xlsx")
 psrc_region_3cnty <- c("Everett/Snohomish County CoC", "Tacoma/Lakewood/Pierce County CoC", "Seattle/King County CoC")
-data_years <- (2014:2024)
+earliest_year <- "2015"
 most_recent_year <- "2024"
+data_years <- (earliest_year:most_recent_year)
 
 # Functions ---------------------
 coc_major_city_lookup <- openxlsx::read.xlsx(pit_path, sheet = most_recent_year, skipEmptyRows = TRUE, colNames = TRUE) |> as_tibble() |> filter(CoC.Category == "Major City CoC") |> distinct(CoC.Number)
@@ -143,14 +144,29 @@ hud_data <- map_dfr(data_years, function(yr) {
     )
 })
 
-# Major city comparison, snapshot
+# Major cities comparison
+major_cities_change <- hud_data |>
+  filter(year >= earliest_year & year <= most_recent_year) |>
+  group_by(coc_name) |>
+  summarise(
+    start_year = min(year),
+    end_year = max(year),
+    total_pct_change = (last(total[order(year)]) - first(total[order(year)])) / first(total[order(year)]),
+    sheltered_pct_change = (last(sheltered[order(year)]) - first(sheltered[order(year)])) / first(sheltered[order(year)]),
+    unsheltered_pct_change = (last(unsheltered[order(year)]) - first(unsheltered[order(year)])) / first(unsheltered[order(year)]),
+    .groups = "drop")
+
 major_cities_snapshot <- hud_data |>
-  filter(year == most_recent_year) |> 
-  arrange(desc(unsheltered_share_total), .by_group = FALSE)
+  group_by(coc_name) |>
+  slice_max(year, n = 1, with_ties = FALSE) |>
+  ungroup()
+
+major_cities_final <- left_join(major_cities_change, major_cities_snapshot, by = "coc_name") |>
+  select(coc_num, coc_name, start_year, end_year, total, sheltered, unsheltered, total_pct_change, sheltered_pct_change, unsheltered_pct_change, unsheltered_share_total)
 
 # PSRC region over time
 psrc_region <- hud_data |>
   filter(coc_name %in% psrc_region_3cnty) |> 
   arrange(coc_name, .by_group = FALSE)
 
-write.xlsx(list("major cities snapshot" = major_cities_snapshot, "PSRC 3 cnty" = psrc_region), file = file.path(file_loc, file = "coc_exploration_export.xlsx"))
+write.xlsx(list("major cities comparison" = major_cities, "PSRC 3 cnty" = psrc_region), file = file.path(file_loc, file = "coc_exploration_export.xlsx"))
