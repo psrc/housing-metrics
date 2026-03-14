@@ -20,11 +20,12 @@ ofm_juris_housing_unit_data <- function(dec = 0) {
   options(dplyr.summarise.inform = FALSE)
   
   # File locations for OFM downloads 
-  ofm_hu_file="x:/DSA/population-trends/data/housing/ofm_april1_postcensal_estimates_housing_1980_1990-present.xlsx"
+  ofm_postcensal_hu_file = "x:/DSA/population-trends/data/housing/ofm_april1_postcensal_estimates_housing_1980_1990-present.xlsx"
+  ofm_intercensal_hu_file = "x:/DSA/population-trends/data/housing/ofm_april1_intercensal_estimates_2010_2020.xlsx"
 
-  # 1980 to present
-  print(stringr::str_glue("Processing OFM post-censal housing estimates from 1980 to present"))
-  ofm_data <- dplyr::as_tibble(openxlsx::read.xlsx(ofm_hu_file, detectDates = FALSE, skipEmptyRows = TRUE, startRow = 4, colNames = TRUE, sheet = "Housing Units")) |>
+  # Post-censal estimates - 2020 to present
+  print(stringr::str_glue("Processing OFM post-censal housing estimates from 2020 to present"))
+  ofm_postcensal_data <- dplyr::as_tibble(openxlsx::read.xlsx(ofm_postcensal_hu_file, detectDates = FALSE, skipEmptyRows = TRUE, startRow = 4, colNames = TRUE, sheet = "Housing Units")) |>
     dplyr::filter(.data$County %in% c("King","Kitsap","Pierce","Snohomish")) |>
     tidyr::pivot_longer(cols=dplyr::contains("Housing"), names_to="temp", values_to="estimate") |>
     dplyr::mutate(Jurisdiction = if_else(str_detect(Jurisdiction, "\\(part\\)"), str_replace(Jurisdiction, "part", County), Jurisdiction)) |>
@@ -38,45 +39,36 @@ ofm_juris_housing_unit_data <- function(dec = 0) {
    dplyr::mutate(estimate = stringr::str_replace_all(.data$estimate, "\\.", " ")) |>
    dplyr::mutate(year = as.numeric(.data$year), estimate = as.numeric(.data$estimate)) |>
    dplyr::mutate(estimate = tidyr::replace_na(.data$estimate, 0)) |>
-   dplyr::mutate(variable = stringr::str_replace_all(.data$variable, "One Unit Housing Units", "sf")) |>
-   dplyr::mutate(variable = stringr::str_replace_all(.data$variable, "Two or More Housing Units", "mf")) |>
-   dplyr::mutate(variable = stringr::str_replace_all(.data$variable, "Mobile Home and Special Housing Units", "mh")) |>
    dplyr::mutate(variable = stringr::str_replace_all(.data$variable, "Total Housing Units", "total")) |>
-   dplyr::rename(geography = "Jurisdiction")
+   dplyr::rename(geography = "Jurisdiction") |>
+   dplyr::filter(variable == "total" & year >= "2020")
   
-  print(stringr::str_glue("Summarizing OFM post-censal housing estimates from 1980 to present for PSRC region"))
-  region <- ofm_data |>
-    dplyr::group_by(.data$year, .data$variable) |>
-    dplyr::filter(geography %in% c("King County", "Kitsap County", "Pierce County", "Snohomish County")) |>
-    dplyr::summarise(estimate = sum(.data$estimate)) |>
-    dplyr::as_tibble() |>
-    dplyr::mutate(geography = "Region")
+  # Inter-censal estimates - 2019 for King County (KC growth targets started in 2019)
+  print(stringr::str_glue("Processing OFM inter-censal housing estimates for 2019 in King County"))
+  ofm_intercensal_data <- dplyr::as_tibble(openxlsx::read.xlsx(ofm_intercensal_hu_file, detectDates = FALSE, skipEmptyRows = TRUE, colNames = TRUE, sheet = "Total Housing")) |>
+    dplyr::filter(.data$County.Name %in% c("King")) |>
+    dplyr::mutate(Jurisdiction = if_else(str_detect(Jurisdiction, "\\(part\\)"), str_replace(Jurisdiction, "part", County.Name), Jurisdiction)) |>
+    dplyr::select(Jurisdiction, `2019.Intercensal.Total.Housing.Unit.Estimate`) |>
+    dplyr::mutate(Jurisdiction = stringr::str_replace_all(Jurisdiction, " city", "")) |>
+    dplyr::mutate(Jurisdiction = stringr::str_replace_all(Jurisdiction, " town", "")) |>
+    dplyr::rename(geography = "Jurisdiction") |>
+    dplyr::rename(estimate = "2019.Intercensal.Total.Housing.Unit.Estimate") |>
+    dplyr::mutate(variable = "total", year = 2019)
   
   # Cleanup
-  print(stringr::str_glue("Combining Jurisdiction and Region tibbles and cleaning up"))
-  tbl <- dplyr::bind_rows(ofm_data, region) |>
+  print(stringr::str_glue("Combining postcensal/intercensal data and cleaning up"))
+  tbl <- dplyr::bind_rows(ofm_postcensal_data, ofm_intercensal_data)|>
     tidyr::pivot_wider(names_from = "variable", values_from = "estimate") |>
-    dplyr::group_by(.data$geography) |>
+    dplyr::group_by(geography) |>         # group by geography
+    dplyr::arrange(year, .by_group = TRUE) |>  # order rows by year within each geography
     
     #clean up South Prairie data - OFM confirms that 112 RV park units are now categorized as mobile homes            #In 2020 population was adjusted, housing units not corrected until 2022. 
-    dplyr::mutate(total = if_else(geography == "South Prairie" & year %in% c(2020, 2021), total + 112, total),
-                  mh = if_else(geography == "South Prairie" & year %in% c(2020, 2021), mh + 112, mh)) |>
-    
-    dplyr::mutate(total_annual_chg = round(.data$total - dplyr::lag(.data$total))) |>
-    dplyr::mutate(sf_chg = round(.data$sf - dplyr::lag(.data$sf))) |>
-    dplyr::mutate(mf_chg = round(.data$mf - dplyr::lag(.data$mf))) |>
-    dplyr::mutate(mh_chg = round(.data$mh - dplyr::lag(.data$mh))) |>
-    dplyr::select("year", "geography",
-                  "sf", "sf_chg",# "sf_per",
-                  "mf", "mf_chg",# "mf_per",
-                  "mh", "mh_chg",# "mh_per",
-                  "total", "total_annual_chg") |>
-    dplyr::arrange(.data$geography, .data$year) |>
-    dplyr::filter(year %in% years ) |>
+    dplyr::mutate(total = if_else(geography == "South Prairie" & year %in% c(2020, 2021), total + 112, total))|>
+#    dplyr::mutate(total_annual_chg = round(total - dplyr::lag(total))) |>
+    dplyr::filter(year <= current_year) |>
     dplyr::filter(!grepl("Incorporated", geography)) |>
     dplyr::filter(!grepl("^(King|Kitsap|Pierce|Snohomish) County$", geography)) |>
-    dplyr::filter(!grepl("Enumclaw \\(Pierce\\)", geography)) |> #removed - no housing targets for Pierce side of Enumclaw
-#   dplyr::filter(!grepl("Pacific \\(Pierce\\)", geography)) |> #removed - no housing units on Pierce side of Pacific
+    dplyr::filter(!grepl("Enumclaw \\(Pierce\\)", geography)) |> #removed - no housing targets for Pierce 
     dplyr::mutate(geography = if_else(str_starts(geography, "Enumclaw"),str_replace(geography, " \\(.*\\)", ""), geography))
   
   return(tbl)
@@ -84,9 +76,12 @@ ofm_juris_housing_unit_data <- function(dec = 0) {
 
 ofm_juris_housing_unit_change <- function() {
   # Crunch change in housing units over time
-  hu <- hu_raw %>% dplyr::select(year, geography, total) %>%
-    group_by(geography) %>%
-    summarise(first_total = total[which.min(year)], last_total = total[which.max(year)], hu_change = last_total - first_total, years = paste(min(year), max(year), sep = "-")) %>%
+  hu <- hu_raw  |> 
+    group_by(geography) |>
+    summarise(first_total = total[which.min(year)],          # total for earliest year in this geo
+              last_total = total[which.max(year)],           # total for latest year in this geo
+              hu_change = last_total - first_total,
+              years = paste(min(year), max(year), sep = "-")) |>
     ungroup()
 }
 
@@ -100,7 +95,9 @@ ofm_annexation_data <- function() {
   ofm_annex_data_raw <- dplyr::as_tibble(openxlsx::read.xlsx(ofm_annexation_link, detectDates = FALSE, skipEmptyRows = TRUE, startRow = 4, colNames = TRUE, sheet = "Annexations"))
   
   ofm_annex_data <- ofm_annex_data_raw |>
-    dplyr::filter(County.Name %in% c("King","Kitsap","Pierce","Snohomish"), `OFM.April.1.Estimate.Year` %in% annex_years)|>
+    dplyr::filter(
+      (County.Name %in% c("Kitsap","Pierce","Snohomish") & `OFM.April.1.Estimate.Year` %in% annex_years_3cnty) |
+      (County.Name == "King" & `OFM.April.1.Estimate.Year` %in% annex_years_king))|>
     dplyr::mutate(dplyr::across(.cols = ends_with(".Date"), ~ as.Date(.x, origin = "1899-12-30"))) |>
     dplyr::group_by(City.Name) |>
     
@@ -148,43 +145,37 @@ hu_targets_juris <- function() {
 }
 
 join_data <- function() {
-  year_label <- paste0(min(years), "-", max(years))
-  n_years <- max(years) - min(years)
+  year_label <- paste0("as_of_", current_year)
   
   net_col <- paste0(year_label, "_net_hu")
-  annual_col <- paste0(year_label, "_annualized_net_hu")
   perc_col <- paste0(year_label, "_perc_of_target")
   
   hu <- hu |> 
+    dplyr::bind_rows(
+      tibble(
+        geography = "Region",
+        first_total = sum(hu$first_total, na.rm = TRUE),
+        last_total  = sum(hu$last_total, na.rm = TRUE),
+        hu_change   = sum(hu$hu_change, na.rm = TRUE),
+        years       = year_label)) |>
     left_join(targets, by = "geography") |>
     left_join(annex, by = "geography") |>
-    dplyr::mutate("{net_col}" := hu_change - dplyr::coalesce(annexed_hu, 0),
-      "{annual_col}" := .data[[net_col]] / n_years,
+    dplyr::mutate(
+      "{net_col}" := hu_change - dplyr::coalesce(annexed_hu, 0),
+      # Round net_hu to nearest 5 unless <20
+      "{net_col}" := if_else(.data[[net_col]] < 20,
+                             .data[[net_col]],
+                             round(.data[[net_col]] / 5) * 5),
       "{perc_col}" := .data[[net_col]] / growth_target)|>
-    select(geography, type, growth_target, dplyr::matches("\\d+_net_hu$"), dplyr::ends_with("_perc_of_target")) |>
+    select(geography, type, years, growth_target, dplyr::matches("\\d+_net_hu$"), dplyr::ends_with("_perc_of_target")) |>
     arrange(type, desc(.data[[perc_col]]))
 }
 
-# Most Recent Period Analysis ------------------
-
-years <- (2024:2025)
-annex_years <- (2025:2025) #Should be 1 less than "years" defined above. EX: year = 2020:2025 and annex_years = 2021:2025
-
-# Clean data
-hu_raw <- ofm_juris_housing_unit_data()
-targets <- hu_targets_juris()
-annex <- ofm_annexation_data()
-
-# Calculate change in units - OFM housing unit data
-hu <- ofm_juris_housing_unit_change()
-
-# Join and analyze
-one_year <- join_data()
-
 # Since Targets were Adopted Analysis ------------------
 
-years <- (2020:2025)
-annex_years <- (2021:2025) #Should be 1 less than "years" defined above. EX: year = 2020:2025 and annex_years = 2021:2025
+current_year <- (2025)
+annex_years_king <- (2020:current_year) #Extra year of annexations for King due to longer housing target period
+annex_years_3cnty <- (2021:current_year) #Should be 1 less year than the housing target period. EX: timespan = 2020:2025 and annex_years = 2021:2025
 
 # Clean data
 hu_raw <- ofm_juris_housing_unit_data()
