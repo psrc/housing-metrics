@@ -167,7 +167,7 @@ join_data <- function() {
                              .data[[net_col]],
                              round(.data[[net_col]] / 5) * 5),
       "{perc_col}" := .data[[net_col]] / growth_target)|>
-    select(geography, type, years, growth_target, dplyr::matches("\\d+_net_hu$"), dplyr::ends_with("_perc_of_target")) |>
+    select(geography, County, type, years, growth_target, dplyr::matches("\\d+_net_hu$"), dplyr::ends_with("_perc_of_target")) |>
     arrange(type, desc(.data[[perc_col]]))
 }
 
