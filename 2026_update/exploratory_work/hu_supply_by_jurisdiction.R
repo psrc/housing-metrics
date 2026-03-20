@@ -1,4 +1,4 @@
-# Exploration of tracking housing supply by jurisdiction
+# Title: Exploration of tracking housing supply by jurisdiction
 # Geographies: Jurisdiction
 # Created By: Eric Clute
 
@@ -9,7 +9,7 @@ library(psrchousing)
 library(openxlsx)
 
 export_path <- "J:/Projects/V2050/Housing/Monitoring/2026Update/exploratory_work/hu_supply_by_juris"
-source_info <- c("OFM April 1 Population and Housing Estimates.")
+source_info <- c("OFM April 1 Housing Estimates (2019 Intercensal estimates & 2020-2025 Postcensal estimates)")
 multi_county_juris <- c("Auburn", "Bothell", "Milton", "Pacific", "Enumclaw")
 
 # Functions ---------------------
@@ -23,7 +23,7 @@ ofm_juris_housing_unit_data <- function(dec = 0) {
   ofm_postcensal_hu_file = "x:/DSA/population-trends/data/housing/ofm_april1_postcensal_estimates_housing_1980_1990-present.xlsx"
   ofm_intercensal_hu_file = "x:/DSA/population-trends/data/housing/ofm_april1_intercensal_estimates_2010_2020.xlsx"
 
-  # Post-censal estimates - 2020 to present
+  # Postcensal estimates - 2020 to present
   print(stringr::str_glue("Processing OFM post-censal housing estimates from 2020 to present"))
   ofm_postcensal_data <- dplyr::as_tibble(openxlsx::read.xlsx(ofm_postcensal_hu_file, detectDates = FALSE, skipEmptyRows = TRUE, startRow = 4, colNames = TRUE, sheet = "Housing Units")) |>
     dplyr::filter(.data$County %in% c("King","Kitsap","Pierce","Snohomish")) |>
@@ -43,7 +43,7 @@ ofm_juris_housing_unit_data <- function(dec = 0) {
    dplyr::rename(geography = "Jurisdiction") |>
    dplyr::filter(variable == "total" & year >= "2020")
   
-  # Inter-censal estimates - 2019 for King County (KC growth targets started in 2019)
+  # Intercensal estimates - 2019 for King County (KC growth targets started in 2019)
   print(stringr::str_glue("Processing OFM inter-censal housing estimates for 2019 in King County"))
   ofm_intercensal_data <- dplyr::as_tibble(openxlsx::read.xlsx(ofm_intercensal_hu_file, detectDates = FALSE, skipEmptyRows = TRUE, colNames = TRUE, sheet = "Total Housing")) |>
     dplyr::filter(.data$County.Name %in% c("King")) |>
