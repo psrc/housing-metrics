@@ -166,13 +166,40 @@ join_data <- function() {
       "{net_col}" := if_else(.data[[net_col]] < 20,
                              .data[[net_col]],
                              round(.data[[net_col]] / 5) * 5),
-      "{perc_col}" := .data[[net_col]] / growth_target)|>
-    select(geography, County, type, years, growth_target, dplyr::matches("\\d+_net_hu$"), dplyr::ends_with("_perc_of_target")) |>
+      "{perc_col}" := .data[[net_col]] / growth_target) |>
     arrange(type, desc(.data[[perc_col]]))
+  
+  hu_subtotals <- hu |>
+    dplyr::filter(type != "Region") |>
+    dplyr::group_by(type) |>
+    dplyr::summarise(
+      geography = paste0(dplyr::first(type), " Total"),
+      growth_target = sum(growth_target, na.rm = TRUE),
+      hu_change = sum(hu_change, na.rm = TRUE),
+      annexed_hu = sum(annexed_hu, na.rm = TRUE),
+      .groups = "drop"
+    ) |>
+    dplyr::mutate(
+      "{net_col}" := hu_change - dplyr::coalesce(annexed_hu, 0),
+      "{net_col}" := if_else(.data[[net_col]] < 20,
+                             .data[[net_col]],
+                             round(.data[[net_col]] / 5) * 5),
+      "{perc_col}" := .data[[net_col]] / growth_target
+    )
+  
+  hu <- hu |>
+    dplyr::bind_rows(hu_subtotals) |>
+    select(
+      geography, County, type, years, growth_target,
+      dplyr::matches("\\d+_net_hu$"),
+      dplyr::ends_with("_perc_of_target")
+    ) |>
+    mutate(is_total = grepl("Total$", geography)) |>
+    arrange(type, is_total, desc(.data[[perc_col]])) |>
+    select(-is_total)
 }
 
 # Since Targets were Adopted Analysis ------------------
-
 current_year <- (2025)
 annex_years_king <- (2020:current_year) #Extra year of annexations for King due to longer housing target period
 annex_years_3cnty <- (2021:current_year) #Should be 1 less year than the housing target period. EX: timespan = 2020:2025 and annex_years = 2021:2025
