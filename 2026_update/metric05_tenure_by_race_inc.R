@@ -2,7 +2,7 @@
 # GEOGRAPHIES: PSRC Region & County
 # DATA SOURCE: 5YR ACS PUMS
 # DATE CREATED: 5.5.2026
-# AUTHOR: Eric Clute & Carol Naito
+# AUTHOR: Eric Clute
 
 library(psrccensus)
 library(magrittr)
@@ -11,6 +11,7 @@ library(srvyr)
 library(tidyr)
 library(openxlsx)
 library(purrr)
+library(stringr)
 
 # Assumptions
 years <- c(2010,2016,2024)
@@ -23,19 +24,37 @@ tenure_re_func <- function(year){
   # Obtain the data
   pums_raw <- get_psrc_pums(5, year, "h", c("TEN","PRACE","HINCP"))
   
-  
   # Create variables
   pums_new_vars <- pums_raw %>% 
-    mutate(tenure=factor(case_when(TEN== 1|TEN== 2 ~ "owner", !is.na(TEN) ~"renter"),
-                         levels=c("owner", "renter")),
-           PRACE=factor(
-             case_when(grepl("^Some", PRACE) ~"Another Racial Identity",
-                       grepl("^Two", PRACE) ~"Multiracial",
-                       grepl("^Black ", PRACE) ~"Black",
-                       grepl("^Hispanic ", PRACE) ~"Hispanic/Latinx",
-                       !is.na(PRACE) ~stringr::str_replace_all(as.character(PRACE), " (and|or) ", "/") %>%
-                         stringr::str_replace(" alone", "") %>%
-                         stringr::str_replace(" Alone", ""))))
+    mutate(tenure=factor(case_when(TEN %in% c(1, 2) |
+                                     str_detect(as.character(TEN), regex("own", ignore_case = TRUE)) ~ "owner",
+                                   TRUE ~ "renter"),
+                         levels = c("owner", "renter")),
+           PRACE = factor(case_when(
+             
+             # 2024+ numeric coding
+             DATA_YEAR >= 2024 & PRACE %in% c("1") ~ "White",
+             DATA_YEAR >= 2024 & PRACE %in% c("2") ~ "Black",
+             DATA_YEAR >= 2024 & PRACE %in% c("3", "4", "5", "American Indian or Alaskan Native") ~ "American Indian or Alaska Native",
+             DATA_YEAR >= 2024 & PRACE %in% c("6") ~ "Asian",
+             DATA_YEAR >= 2024 & PRACE %in% c("7") ~ "Native Hawaiian/Pacific Islander",
+             DATA_YEAR >= 2024 & PRACE %in% c("8") ~ "Another Racial Identity",
+             DATA_YEAR >= 2024 & PRACE %in% c("9") ~ "Multiracial",
+             DATA_YEAR >= 2024 & PRACE %in% c("Hispanic or Latino") ~ "Hispanic or Latino",
+             
+             # Pre-2024 text coding
+             DATA_YEAR < 2024 & grepl("^Some", PRACE) ~ "Another Racial Identity",
+             DATA_YEAR < 2024 & grepl("^Two", PRACE) ~ "Multiracial",
+             DATA_YEAR < 2024 & grepl("^Black ", PRACE) ~ "Black",
+             DATA_YEAR < 2024 & grepl("^Hispanic ", PRACE) ~ "Hispanic or Latino",
+             DATA_YEAR < 2024 & grepl("^American Indian", PRACE) ~ "American Indian or Alaska Native",
+             DATA_YEAR < 2024 & grepl("^Alaska Native", PRACE) ~ "American Indian or Alaska Native",
+             
+             DATA_YEAR < 2024 & !is.na(PRACE) ~ 
+               stringr::str_replace_all(as.character(PRACE), " (and|or) ", "/") %>%
+               stringr::str_replace(" alone", "") %>%
+               stringr::str_replace(" Alone", "")
+           )))
   
   # Analysis --------------
   tenure_re <- psrc_pums_count(pums_new_vars, group_vars = c("PRACE","tenure"),rr=TRUE)
@@ -47,8 +66,14 @@ tenure_re_func <- function(year){
                 names_from = 'tenure',
                 values_from = c('count', 'count_moe','reliability', 'share', 'share_moe'))
   
-  tenure_re_piv <- tenure_re_piv[, c(1,2,12,13,15,16,14,17,3,4,5,6,7,8,9,10,11)]
-  tenure_re_piv <- tenure_re_piv[tenure_re_piv$PRACE !='Total',]
+  tenure_re_piv <- tenure_re_piv |> select(DATA_YEAR,
+                                            PRACE,
+                                            share_owner, share_renter, share_moe_owner, share_moe_renter,
+                                            share_Total, share_moe_Total,
+                                            count_owner, count_renter, count_Total,
+                                            count_moe_owner, count_moe_renter, count_moe_Total,
+                                            reliability_owner, reliability_renter, reliability_Total) |>
+    filter(PRACE != "Total")
   
   # Pivot table 2
   tenure_region_piv <- tenure_region %>%
@@ -98,16 +123,35 @@ tenure_inc_func <- function(year){
                                       "$150,000-$199,999",
                                       "$200,000 or more",
                                       "Else / Prefer not to answer")),
-           tenure=factor(case_when(TEN== 1|TEN== 2 ~ "owner", !is.na(TEN) ~"renter"),
-                         levels=c("owner", "renter")),
-           PRACE=factor(
-             case_when(grepl("^Some", PRACE) ~"Another Racial Identity",
-                       grepl("^Two", PRACE) ~"Multiracial",
-                       grepl("^Black ", PRACE) ~"Black",
-                       grepl("^Hispanic ", PRACE) ~"Hispanic/Latinx",
-                       !is.na(PRACE) ~stringr::str_replace_all(as.character(PRACE), " (and|or) ", "/") %>%
-                         stringr::str_replace(" alone", "") %>%
-                         stringr::str_replace(" Alone", ""))))
+           tenure=factor(case_when(TEN %in% c(1, 2) |
+                                     str_detect(as.character(TEN), regex("own", ignore_case = TRUE)) ~ "owner",
+                                   TRUE ~ "renter"),
+                         levels = c("owner", "renter")),
+           PRACE = factor(case_when(
+             
+             # 2024+ numeric coding
+             DATA_YEAR >= 2024 & PRACE %in% c("1") ~ "White",
+             DATA_YEAR >= 2024 & PRACE %in% c("2") ~ "Black",
+             DATA_YEAR >= 2024 & PRACE %in% c("3", "4", "5", "American Indian or Alaskan Native") ~ "American Indian or Alaska Native",
+             DATA_YEAR >= 2024 & PRACE %in% c("6") ~ "Asian",
+             DATA_YEAR >= 2024 & PRACE %in% c("7") ~ "Native Hawaiian/Pacific Islander",
+             DATA_YEAR >= 2024 & PRACE %in% c("8") ~ "Another Racial Identity",
+             DATA_YEAR >= 2024 & PRACE %in% c("9") ~ "Multiracial",
+             DATA_YEAR >= 2024 & PRACE %in% c("Hispanic or Latino") ~ "Hispanic or Latino",
+             
+             # Pre-2024 text coding
+             DATA_YEAR < 2024 & grepl("^Some", PRACE) ~ "Another Racial Identity",
+             DATA_YEAR < 2024 & grepl("^Two", PRACE) ~ "Multiracial",
+             DATA_YEAR < 2024 & grepl("^Black ", PRACE) ~ "Black",
+             DATA_YEAR < 2024 & grepl("^Hispanic ", PRACE) ~ "Hispanic or Latino",
+             DATA_YEAR < 2024 & grepl("^American Indian", PRACE) ~ "American Indian or Alaska Native",
+             DATA_YEAR < 2024 & grepl("^Alaska Native", PRACE) ~ "American Indian or Alaska Native",
+             
+             DATA_YEAR < 2024 & !is.na(PRACE) ~ 
+               stringr::str_replace_all(as.character(PRACE), " (and|or) ", "/") %>%
+               stringr::str_replace(" alone", "") %>%
+               stringr::str_replace(" Alone", "")
+           )))
   
   # Analysis --------------
   tenure_inc_re <- psrc_pums_count(pums_new_vars, group_vars = c("income_bin","PRACE","tenure"),rr=TRUE)

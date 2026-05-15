@@ -107,12 +107,20 @@ rcb_inc_func <- function(rcb){
   rcb <- real_dollars(rcb, inflation_year)
   
   # Filter to only renters, create income/rent burden groupings, rename income categories
-  rcb <- rcb %>% filter(TEN=="Rented") %>%
+rcb <- rcb |>
+  filter(
+    (DATA_YEAR < 2024 & TEN == "Rented") |
+    (DATA_YEAR >= 2024 & TEN %in% c(3, 4))
+  ) %>%
     mutate(
       rent_burden = create_rent_burden_column(GRPIP),
-      income_bin=factor(case_when(HINCP2024 < 25000 ~ "Under $25,000",
-                                  HINCP2024 < 35000 ~ "$25,000-$34,999",
-                                  HINCP2024 < 50000 ~ "$35,000-$49,999",
+      income_bin = factor(case_when(
+        HINCP2024 < 25000 ~ "Under $25,000",
+        HINCP2024 < 35000 ~ "$25,000-$34,999",
+        HINCP2024 < 50000 ~ "$35,000-$49,999",
+        HINCP2024 < 75000 ~ "$50,000-$74,999",
+        HINCP2024 < 100000 ~ "$75,000-$99,999",
+        HINCP2024 >= 1
                                   HINCP2024 < 75000 ~ "$50,000-$74,999",
                                   HINCP2024 < 100000 ~ "$75,000-$99,999",
                                   HINCP2024 >=100000 ~ "$100,000 or more",
