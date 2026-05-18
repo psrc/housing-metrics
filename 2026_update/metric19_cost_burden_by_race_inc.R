@@ -64,38 +64,18 @@ create_rent_burden_column <- function(GRPIP){
 rcb_re_func <- function(rcb){
   # Filter to only renters, create income/rent burden groupings, rename race/ethnicity categories, combine Some other Race & Two or More Races
   rcb <- rcb %>% 
-    filter(
-      (DATA_YEAR < 2024 & TEN == "Rented") |
-        (DATA_YEAR >= 2024 & TEN %in% c(3, 4)))%>%
+    filter(TEN == "Rented") %>%
     mutate(
       rent_burden = create_rent_burden_column(GRPIP),
       
-      PRACE = factor(case_when(
-        
-        # 2024+ numeric coding
-        DATA_YEAR >= 2024 & PRACE %in% c("1") ~ "White",
-        DATA_YEAR >= 2024 & PRACE %in% c("2") ~ "Black",
-        DATA_YEAR >= 2024 & PRACE %in% c("3", "4", "5", "American Indian or Alaskan Native") ~ "American Indian or Alaska Native",
-        DATA_YEAR >= 2024 & PRACE %in% c("6") ~ "Asian",
-        DATA_YEAR >= 2024 & PRACE %in% c("7") ~ "Native Hawaiian/Pacific Islander",
-        DATA_YEAR >= 2024 & PRACE %in% c("8") ~ "Another Racial Identity",
-        DATA_YEAR >= 2024 & PRACE %in% c("9") ~ "Multiracial",
-        DATA_YEAR >= 2024 & PRACE %in% c("Hispanic or Latino") ~ "Hispanic or Latino",
-        
-        # Pre-2024 text coding
-        DATA_YEAR < 2024 & grepl("^Some", PRACE) ~ "Another Racial Identity",
-        DATA_YEAR < 2024 & grepl("^Two", PRACE) ~ "Multiracial",
-        DATA_YEAR < 2024 & grepl("^Black ", PRACE) ~ "Black",
-        DATA_YEAR < 2024 & grepl("^Hispanic ", PRACE) ~ "Hispanic or Latino",
-        DATA_YEAR < 2024 & grepl("^American Indian", PRACE) ~ "American Indian or Alaska Native",
-        DATA_YEAR < 2024 & grepl("^Alaska Native", PRACE) ~ "American Indian or Alaska Native",
-        
-        DATA_YEAR < 2024 & !is.na(PRACE) ~ 
-          stringr::str_replace_all(as.character(PRACE), " (and|or) ", "/") %>%
-          stringr::str_replace(" alone", "") %>%
-          stringr::str_replace(" Alone", "")
-      ))
-    )
+      PRACE=factor(
+        case_when(grepl("^Some", PRACE) ~"Another Racial Identity",
+                  grepl("^Two", PRACE) ~"Multiracial",
+                  grepl("^Black ", PRACE) ~"Black",
+                  grepl("^Hispanic ", PRACE) ~"Hispanic/Latinx",
+                  !is.na(PRACE) ~stringr::str_replace_all(as.character(PRACE), " (and|or) ", "/") %>%
+                    stringr::str_replace(" alone", "") %>%
+                    stringr::str_replace(" Alone", "")))) 
   
   summarize_and_clean(rcb, c("PRACE", "rent_burden"))
 }
@@ -108,19 +88,12 @@ rcb_inc_func <- function(rcb){
   
   # Filter to only renters, create income/rent burden groupings, rename income categories
 rcb <- rcb |>
-  filter(
-    (DATA_YEAR < 2024 & TEN == "Rented") |
-    (DATA_YEAR >= 2024 & TEN %in% c(3, 4))
-  ) %>%
+  filter((TEN == "Rented")) %>%
     mutate(
       rent_burden = create_rent_burden_column(GRPIP),
-      income_bin = factor(case_when(
-        HINCP2024 < 25000 ~ "Under $25,000",
-        HINCP2024 < 35000 ~ "$25,000-$34,999",
-        HINCP2024 < 50000 ~ "$35,000-$49,999",
-        HINCP2024 < 75000 ~ "$50,000-$74,999",
-        HINCP2024 < 100000 ~ "$75,000-$99,999",
-        HINCP2024 >= 1
+      income_bin=factor(case_when(HINCP2024 < 25000 ~ "Under $25,000",
+                                  HINCP2024 < 35000 ~ "$25,000-$34,999",
+                                  HINCP2024 < 50000 ~ "$35,000-$49,999",
                                   HINCP2024 < 75000 ~ "$50,000-$74,999",
                                   HINCP2024 < 100000 ~ "$75,000-$99,999",
                                   HINCP2024 >=100000 ~ "$100,000 or more",
