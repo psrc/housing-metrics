@@ -99,7 +99,7 @@ region_clean <- rbind(dfs$bsp, dfs$sb, dfs$tl)
 
 # create plots
 
-```{r, chart 1 - Loan Denial Rates by Race and Ethnicity (2023)}
+```{r, chart 1 - Loan Denial Rates by Race and Ethnicity}
 
 region_race_currentyear <- region_clean[region_clean$race_ethnicity %in% c("American Indian or Alaska Native", "Asian",
                                                                   "Black or African American", "Hispanic or Latino",
@@ -113,7 +113,7 @@ region_race_currentyear <- region_clean[region_clean$race_ethnicity %in% c("Amer
                                       "Black", "Hispanic or Latino",
                                       "Native Hawaiian or Other Pacific Islander",
                                       "Two or more non-white races", "White")) %>%
-  filter(data_year == "2023")%>%
+  filter(data_year == current_year)%>%
   group_by(race_ethnicity)%>%
   summarise(received=sum(received),
             denied=(sum(denied)))
@@ -165,7 +165,7 @@ denial_race_static_line
 region_currentyear_income_race <- region_clean[region_clean$race_ethnicity %in% c("White", "Asian","Black or African American", "Hispanic or Latino"), ] %>%
   mutate(median_income = fct_relevel(median_income, 
                                      "less than 50%", "50-79%", "80-99%", "100-119%", "120% or more")) %>%
-  filter(data_year == "2023") %>%
+  filter(data_year == current_year) %>%
   group_by(median_income, race_ethnicity)%>%
   summarise(received=sum(received),
             denied=(sum(denied)))
