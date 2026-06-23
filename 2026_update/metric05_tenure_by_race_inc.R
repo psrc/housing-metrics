@@ -143,9 +143,6 @@ tenure_inc_func <- function(year){
   
   # Combine together - adds regional average to table
   tenure_inc_re_piv <- rbind(tenure_inc_re_piv, tenure_inc_re_region_piv)
-  
-  # Limit to 4 largest RE groups (Asian, Black, Hispanic, White) - keep region avg
-  tenure_inc_re_piv <- tenure_inc_re_piv %>% filter(!row_number() %in% c(1,5,6))
 
 }
 

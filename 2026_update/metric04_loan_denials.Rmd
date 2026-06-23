@@ -1,7 +1,7 @@
 ---
 title: "loan_denial_rates"
 author: "Eric Clute & Meg Grzybowski"
-date: "2026-05-6"
+date: "2026-06-23"
 output:
   html_document:
     df_print: paged
@@ -11,7 +11,7 @@ output:
 
 # NOTES: This analysis was originally completed for the February 2024 equity trend using 2018-2022 data (https://www.psrc.org/media/8436). Data saved to 2023 monitoring directories since the data was collected for that project. 
 
-# New data was made available from the FFIEC in July 2025. In future years consider pulling data into R directly using JSON, API. 2024 & 2023 data was cleaned to match table formatting of 2022 - watch this in future years!
+# New data was made available from the FFIEC in June 2026. In future years consider pulling data into R directly using JSON, API. 2024 & 2023 data was cleaned to match table formatting of 2022 - watch this in future years!
 
 
 library(magrittr)
@@ -38,7 +38,7 @@ install_psrc_fonts()
 ## add a column to the left which becomes your new 'A' column and copy the income indicators from previous years into that column
 
 ```{r, set location}
-network_file_loc<-'J:/Projects/V2050/Housing/Monitoring/2026Update/Data/metric04_loan_denials'
+network_file_loc<-'J:/Projects/V2050/Housing/Monitoring/2026Update/data/metric04_loan_denials'
 current_year = 2025
 ```
 
@@ -99,7 +99,7 @@ region_clean <- rbind(dfs$bsp, dfs$sb, dfs$tl)
 
 # create plots
 
-```{r, chart 1 - Loan Denial Rates by Race and Ethnicity (2023)}
+```{r, chart 1 - Loan Denial Rates by Race and Ethnicity}
 
 region_race_currentyear <- region_clean[region_clean$race_ethnicity %in% c("American Indian or Alaska Native", "Asian",
                                                                   "Black or African American", "Hispanic or Latino",
@@ -113,7 +113,7 @@ region_race_currentyear <- region_clean[region_clean$race_ethnicity %in% c("Amer
                                       "Black", "Hispanic or Latino",
                                       "Native Hawaiian or Other Pacific Islander",
                                       "Two or more non-white races", "White")) %>%
-  filter(data_year == "2023")%>%
+  filter(data_year == current_year)%>%
   group_by(race_ethnicity)%>%
   summarise(received=sum(received),
             denied=(sum(denied)))
@@ -165,7 +165,7 @@ denial_race_static_line
 region_currentyear_income_race <- region_clean[region_clean$race_ethnicity %in% c("White", "Asian","Black or African American", "Hispanic or Latino"), ] %>%
   mutate(median_income = fct_relevel(median_income, 
                                      "less than 50%", "50-79%", "80-99%", "100-119%", "120% or more")) %>%
-  filter(data_year == "2023") %>%
+  filter(data_year == current_year) %>%
   group_by(median_income, race_ethnicity)%>%
   summarise(received=sum(received),
             denied=(sum(denied)))
