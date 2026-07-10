@@ -8,8 +8,8 @@ library(tidyverse)
 library(psrchousing)
 library(openxlsx)
 
-export_path <- "J:/Projects/V2050/Housing/Monitoring/2026Update/exploratory_work/hu_supply_by_juris"
-source_info <- c("OFM April 1 Housing Estimates (2019 Intercensal estimates & 2020-2025 Postcensal estimates)")
+export_path <- "J:/Projects/V2050/Housing/Monitoring/2026Update/exploratory_work/hu_supply_by_juris/2026_data"
+source_info <- c("OFM April 1 Housing Estimates (2019 Intercensal estimates & 2020-2026 Postcensal estimates)")
 multi_county_juris <- c("Auburn", "Bothell", "Milton", "Pacific", "Enumclaw")
 
 # Functions ---------------------
@@ -200,7 +200,7 @@ join_data <- function() {
 }
 
 # Since Targets were Adopted Analysis ------------------
-current_year <- (2025)
+current_year <- (2026)
 annex_years_king <- (2020:current_year) #Extra year of annexations for King due to longer housing target period
 annex_years_3cnty <- (2021:current_year) #Should be 1 less year than the housing target period. EX: timespan = 2020:2025 and annex_years = 2021:2025
 
@@ -216,4 +216,4 @@ hu <- ofm_juris_housing_unit_change()
 multi_year <- join_data()
 
 # Export ------------------
-openxlsx::write.xlsx(multi_year, file = file.path(export_path, "export_analysis_tbl.xlsx"), rowNames = FALSE)
+openxlsx::write.xlsx(multi_year, file = file.path(export_path, "export_analysis_tbl2026_DRAFT.xlsx"), rowNames = FALSE)
