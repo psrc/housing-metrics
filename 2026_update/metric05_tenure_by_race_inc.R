@@ -24,10 +24,10 @@ setwd("J:/Projects/V2050/Housing/Monitoring/2026Update/data/metric05_tenure_by_r
 tenure_re_func <- function(year){
   
   # Obtain the data
-  pums_raw <- get_psrc_pums(5, year, "h", c("TEN","PRACE","HINCP"))
+  pums_raw_reg <- get_psrc_pums(5, year, "h", c("TEN","PRACE","HINCP","AGEP"))
   
   # Create variables
-  pums_new_vars <- pums_raw %>% 
+  pums_new_vars_reg <- pums_raw_reg %>% 
     mutate(tenure=factor(case_when(TEN=="Owned free and clear"| TEN=="Owned with mortgage or loan (include home equity loans)" ~ "owner", !is.na(TEN) ~"renter"),
                          levels=c("owner", "renter")),
            PRACE=factor(
@@ -40,14 +40,28 @@ tenure_re_func <- function(year){
                          stringr::str_replace(" Alone", "")))) 
   
   # Analysis --------------
-  tenure_re <- psrc_pums_count(pums_new_vars, group_vars = c("PRACE","tenure"),rr=TRUE)
-  tenure_region <- psrc_pums_count(pums_new_vars, group_vars = c("tenure"),rr=TRUE)
+  tenure_re <- psrc_pums_count(pums_new_vars_reg, group_vars = c("PRACE","tenure"),rr=TRUE)
+  tenure_region <- psrc_pums_count(pums_new_vars_reg, group_vars = c("tenure"),rr=TRUE)
+  
+  tenure_re_med_age <- psrc_pums_median(pums_new_vars_reg, stat_var = "AGEP", group_vars = c("PRACE", "tenure"))
+  tenure_region_med_age <- psrc_pums_median(pums_new_vars_reg, stat_var = "AGEP", group_vars = c("tenure"))
+  
+  #Join age data with race/income
+  tenure_re <- tenure_re %>%
+    left_join(tenure_re_med_age %>%
+                select(DATA_YEAR, COUNTY, PRACE, tenure, AGEP_median, AGEP_median_moe),
+              by = c("DATA_YEAR", "COUNTY", "PRACE", "tenure"))
+  
+  tenure_region <- tenure_region %>%
+    left_join(tenure_region_med_age %>%
+                select(DATA_YEAR, COUNTY, tenure, AGEP_median, AGEP_median_moe),
+              by = c("DATA_YEAR", "COUNTY", "tenure"))
   
   # Pivot table 1
   tenure_re_piv <- tenure_re %>% 
     pivot_wider(id_cols = c( 'DATA_YEAR', 'PRACE'),
                 names_from = 'tenure',
-                values_from = c('count', 'count_moe','reliability', 'share', 'share_moe'))
+                values_from = c('count', 'count_moe','reliability', 'share', 'share_moe', 'AGEP_median', 'AGEP_median_moe'))
   
   tenure_re_piv <- tenure_re_piv |> select(DATA_YEAR,
                                             PRACE,
@@ -55,14 +69,16 @@ tenure_re_func <- function(year){
                                             share_Total, share_moe_Total,
                                             count_owner, count_renter, count_Total,
                                             count_moe_owner, count_moe_renter, count_moe_Total,
-                                            reliability_owner, reliability_renter, reliability_Total) |>
+                                            reliability_owner, reliability_renter, reliability_Total,
+                                            AGEP_median_owner, AGEP_median_renter, AGEP_median_Total,
+                                            AGEP_median_moe_owner, AGEP_median_moe_renter, AGEP_median_moe_Total) |>
     filter(PRACE != "Total")
   
   # Pivot table 2
   tenure_region_piv <- tenure_region %>%
     pivot_wider(id_cols = c( 'DATA_YEAR'),
                 names_from = 'tenure',
-                values_from = c('count', 'count_moe','reliability', 'share', 'share_moe'))
+                values_from = c('count', 'count_moe','reliability', 'share', 'share_moe', 'AGEP_median', 'AGEP_median_moe'))
   
   tenure_region_piv$PRACE <- "Region Avg"
   
@@ -71,27 +87,15 @@ tenure_re_func <- function(year){
   
 }
 
-# Run function -----------
-tenure_re_piv_all <- map(years, ~tenure_re_func(.x)) %>%
-  reduce(bind_rows)
-
-# Graph ownership over time -----------
-library(psrcplot)
-library(ggplot2)
-
-ownership_re <- interactive_line_chart(tenure_re_piv_all, "DATA_YEAR", "share_owner", fill = "PRACE",
-                                           title="Change in Ownership by Race/Ethnicity",color="pognbgy_10")
-ownership_re
-
 #-------------- Group by Tenure (ownership), Income, R/E Category --------------
 
 tenure_inc_func <- function(year){
   
   # Obtain the data
-  pums_raw <- get_psrc_pums(5, year, "h", c("TEN","PRACE","HINCP"))
+  pums_raw_re <- get_psrc_pums(5, year, "h", c("TEN","PRACE","HINCP","AGEP"))
 
   # Create variables
-  pums_new_vars <- pums_raw %>% 
+  pums_new_vars_re <- pums_raw_re %>% 
     mutate(income_bin=factor(case_when(HINCP < 50000 ~ "Under $50,000",
                                        HINCP < 75000 ~ "$50,000-$74,999",
                                        HINCP < 100000 ~ "$75,000-$99,999",
@@ -118,26 +122,37 @@ tenure_inc_func <- function(year){
                          stringr::str_replace(" Alone", ""))))
   
   # Analysis --------------
-  tenure_inc_re <- psrc_pums_count(pums_new_vars, group_vars = c("income_bin","PRACE","tenure"),rr=TRUE)
-  tenure_inc_re_region <- psrc_pums_count(pums_new_vars, group_vars = c("income_bin","tenure"),rr=TRUE)
+  tenure_inc_re <- psrc_pums_count(pums_new_vars_re, group_vars = c("income_bin","PRACE","tenure"),rr=TRUE)
+  tenure_inc_re_region <- psrc_pums_count(pums_new_vars_re, group_vars = c("income_bin","tenure"),rr=TRUE)
   
+  tenure_inc_re_med_age <- psrc_pums_median(pums_new_vars_re, stat_var = "AGEP", group_vars = c("income_bin", "PRACE", "tenure"))
+  tenure_inc_re_region_med_age <- psrc_pums_median(pums_new_vars_re, stat_var = "AGEP", group_vars = c("income_bin", "tenure"))
 
   tenure_inc_re <- tenure_inc_re %>% filter(tenure=='owner')
   tenure_inc_re_region <- tenure_inc_re_region %>% filter(tenure=='owner')
+ 
+  #Join age data with race/income
+  tenure_inc_re <- tenure_inc_re %>%
+    left_join(tenure_inc_re_med_age %>%
+                select(DATA_YEAR, COUNTY, income_bin, PRACE, tenure, AGEP_median, AGEP_median_moe),
+              by = c("DATA_YEAR", "COUNTY", "income_bin", "PRACE", "tenure"))
   
+  tenure_inc_re_region <- tenure_inc_re_region %>%
+    left_join(tenure_inc_re_region_med_age %>%
+                select(DATA_YEAR, COUNTY, income_bin, tenure, AGEP_median, AGEP_median_moe),
+              by = c("DATA_YEAR","income_bin", "COUNTY", "tenure"))
+   
   # Pivot table 1
   tenure_inc_re_piv <- tenure_inc_re %>% 
     pivot_wider(id_cols = c( 'DATA_YEAR', 'tenure', 'PRACE'),
                 names_from = 'income_bin',
-                values_from = c('count', 'count_moe', 'share', 'share_moe','reliability'))
-  
-  tenure_inc_re_piv<- tenure_inc_re_piv[, c(1,2,3,16,17,18,19,20,21,22,23,24,25,26,27,4,5,6,7,8,9,10,11,12,13,14,15,28,29,30,31,32,33)]
+                values_from = c('count', 'count_moe', 'share', 'share_moe','reliability', 'AGEP_median', 'AGEP_median_moe'))
   
   # Pivot table 2
   tenure_inc_re_region_piv <- tenure_inc_re_region %>% 
     pivot_wider(id_cols = c( 'DATA_YEAR', 'tenure'),
                 names_from = 'income_bin',
-                values_from = c('count', 'count_moe', 'share', 'share_moe','reliability'))
+                values_from = c('count', 'count_moe', 'share', 'share_moe','reliability', 'AGEP_median', 'AGEP_median_moe'))
   
   tenure_inc_re_region_piv$PRACE <- "Region Avg"
   
@@ -146,9 +161,21 @@ tenure_inc_func <- function(year){
 
 }
 
-# Run function -----------
+# Run functions -----------
+
+tenure_re_piv_all <- map(years, ~tenure_re_func(.x)) %>%
+  reduce(bind_rows)
+
 tenure_inc_re_all <- map(years, ~tenure_inc_func(.x)) %>%
   reduce(bind_rows)
+
+# Graph ownership over time -----------
+library(psrcplot)
+library(ggplot2)
+
+ownership_re <- interactive_line_chart(tenure_re_piv_all, "DATA_YEAR", "share_owner", fill = "PRACE",
+                                       title="Change in Ownership by Race/Ethnicity",color="pognbgy_10")
+ownership_re
 
 # Format small tables to be exported ------------------------
 tenure_re_smalltbl <- pivot_wider(tenure_re_piv_all,id_cols = PRACE, names_from = DATA_YEAR, values_from = c(share_owner, share_moe_owner))
