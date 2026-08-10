@@ -9,7 +9,7 @@ library(openxlsx)
 library(magrittr)
 
 value_url <- "https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_market_tracker/redfin_metro_market_tracker.tsv000.gz"
-save_path <- "J:/Projects/V2050/Housing/Monitoring/2025Update/data/metric14_median_home_price_by_type/metric14_raw.csv"
+save_path <- "J:/Projects/V2050/Housing/Monitoring/2026Update/data/metric14_median_home_price_by_type/metric14_raw.csv"
 
 metro_area <- "Seattle, WA"
 earliestdate <- "2012-07-01"
