@@ -13,7 +13,7 @@ save_path <- "J:/Projects/V2050/Housing/Monitoring/2026Update/data/metric14_medi
 
 metro_area <- "Seattle, WA"
 earliestdate <- "2012-07-01"
-latestdate <- "2026-06-01"
+latestdate <- "2026-05-01"
 
 # Import Redfin data, limit to metro area and by date
 redfin_raw <- read_tsv(value_url)

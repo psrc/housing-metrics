@@ -19,11 +19,11 @@ source_info <- c("Source: Zillow, Home Value Index; Freddie Mac, Primary Mortgag
 
 metro_area <- "Seattle, WA"
 
-earliestdate <- "2012-06-30"
-latestdate <- "2026-06-30"
+earliestdate <- "2012-08-31"
+latestdate <- "2026-08-31"
 
-smalltbl_earliestdate <- "2021-06-30"
-smalltbl_latestdate <- "2026-06-30"
+smalltbl_earliestdate <- "2021-08-31"
+smalltbl_latestdate <- "2026-08-31"
 
 term <- 360                     # 30 year mortgage
 downpayment <- 0.20             # JCHS report used 3.5% but I will use 20% given our market conditions
