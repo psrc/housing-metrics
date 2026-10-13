@@ -1,0 +1,132 @@
+---
+title: "Housing Permits Charts"
+author: "Kristin Mitchell"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+#| include: false
+library(readxl)
+library(dplyr)
+library(zoo)  #zoo is a library to calculate the rolling averages
+library(ggplot2)
+library(openxlsx)
+library(readxl)
+library(stringr)
+library(tidyverse)
+```
+
+
+First run census_permits_data_pull.Rmd to create the excel file with a table. 
+
+Read in the excel table:
+```{r}
+
+#setwd("C:/Coding/housing-permits/2026update")
+
+permits <-read_excel("C:/Coding/housing-permits/2026update/census_bps_monthly.xlsx")
+
+```
+
+Calculate annual averages
+
+```{r}
+
+permits_year <- permits %>% 
+   separate(Month, into = c("year", "month"), sep = "-")
+
+annual_df<- permits_year%>%group_by(year)%>%
+           summarise(sum_Total=sum(Total),
+                     sum_1Unit=sum(`1 Unit`))
+
+annual_df <- annual_df %>%group_by(year)%>%
+  mutate(mf_total = sum(sum_Total-sum_1Unit))
+
+
+annual_df <- annual_df %>% rename(sf_total = sum_1Unit)
+
+annual_total <- annual_df %>%
+  select(year, sf_total, mf_total) %>%
+  pivot_longer(cols=c(sf_total, mf_total), values_to = "count")
+  
+
+## chart showing yearly permitted units by month
+
+annual_tot_plot<-ggplot(annual_total) +
+  geom_bar(aes(x=year, y=count,fill=name), stat="identity")+
+  #scale_color_manual(values=c("#F05A28","#91268F"))+
+  scale_fill_manual(values=c("#F05A28","#91268F"
+                             #"#A9D46E"
+                             ))+
+    theme(axis.title.x=element_blank(),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.title.y=element_blank(),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+       panel.background = element_blank(), axis.line = element_line(colour = "black"))+
+  theme(legend.position = "bottom",
+        legend.title = element_blank())+
+  labs(title="Yearly Permitted Units", subtitle="Note: 2026 incomplete (January - August)")
+
+annual_tot_plot
+
+```
+
+
+```{r}
+
+month <- permits_year%>%
+  group_by(year)%>%
+           summarise(sum_Total=sum(Total),
+                     sum_1Unit=sum(`1 Unit`)) %>%
+  filter(year!="2026")
+
+month_df <- month %>%group_by(year)%>%
+  mutate(mf_total = sum(sum_Total-sum_1Unit)) %>%
+  mutate(tot_month_avg = sum(sum_Total/12)) %>%
+  mutate(mf_month_avg = sum(mf_total/12)) %>%
+  mutate(sf_month_avg = sum(sum_1Unit/12))
+
+month_26 <- permits_year%>%
+  group_by(year)%>%
+           summarise(sum_Total=sum(Total),
+                     sum_1Unit=sum(`1 Unit`)) %>%
+  filter(year=="2026")
+
+month_df_26 <- month_26 %>%group_by(year)%>%
+  mutate(mf_total = sum(sum_Total-sum_1Unit)) %>%
+  mutate(tot_month_avg = sum(sum_Total/8)) %>%
+  mutate(mf_month_avg = sum(mf_total/8)) %>%
+  mutate(sf_month_avg = sum(sum_1Unit/8))
+
+month_df <- rbind(month_df, month_df_26)
+
+month_avg <- month_df %>%
+  select(year, sf_month_avg, mf_month_avg) %>%
+  pivot_longer(cols=c(sf_month_avg, mf_month_avg), values_to = "count")
+  
+
+## chart showing average monthly permitted units
+
+month_avg_plot<-ggplot(month_avg) +
+  geom_bar(aes(x=year, y=count,fill=name), stat="identity")+
+  #scale_color_manual(values=c("#F05A28","#91268F"))+
+  scale_fill_manual(values=c("#F05A28","#91268F"
+                             #"#A9D46E"
+                             ))+
+    theme(axis.title.x=element_blank(),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.title.y=element_blank(),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+       panel.background = element_blank(), axis.line = element_line(colour = "black"))+
+  theme(legend.position = "bottom",
+        legend.title = element_blank())+
+  labs(title="Average Monthly Permitted Units", subtitle="Note: 2026 includes January - August")
+
+month_avg_plot
+
+```
