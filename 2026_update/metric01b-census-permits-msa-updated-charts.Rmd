@@ -1,6 +1,6 @@
 ---
 title: "Housing Permits Charts"
-author: "Kristin Mitchell"
+author: "Kristin Mitchell & small edits by Eric Clute"
 output: html_document
 ---
 
@@ -19,6 +19,7 @@ library(openxlsx)
 library(readxl)
 library(stringr)
 library(tidyverse)
+library(here)
 ```
 
 
@@ -27,9 +28,8 @@ First run census_permits_data_pull.Rmd to create the excel file with a table.
 Read in the excel table:
 ```{r}
 
-#setwd("C:/Coding/housing-permits/2026update")
-
-permits <-read_excel("C:/Coding/housing-permits/2026update/census_bps_monthly.xlsx")
+file_path <- file.path(here(), "2026_update/census_bps_monthly.xlsx")
+permits <-read_excel(file_path)
 
 ```
 
@@ -74,6 +74,32 @@ annual_tot_plot<-ggplot(annual_total) +
 
 annual_tot_plot
 
+```
+
+Calculate total production between Jan-Aug and Sept-Dec by year
+
+```{r}
+
+split_year <- permits_year %>% mutate(split = case_when(month %in% c("01", "02", "03", "04", "05", "06", "07", "08") ~ "Jan-Aug",
+                                                        month %in% c("09", "10", "11", "12") ~ "Sept-Dec"))
+
+split_year <- split_year %>% group_by(year, split) %>%
+                             summarise(sum_Total=sum(Total)) %>%
+                             mutate(split = factor(split, levels = c("Jan-Aug", "Sept-Dec")))
+
+split_year_plot <- ggplot(split_year) +
+  geom_bar(aes(x = year, y = sum_Total, fill = split), stat = "identity", position = position_stack(reverse = TRUE)) +
+    scale_fill_manual(values = c("Jan-Aug" = "#00A7A0", "Sept-Dec" = "#A9D46E"))+
+    theme(axis.title.x=element_blank(),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.title.y=element_blank(),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+       panel.background = element_blank(), axis.line = element_line(colour = "black"))+
+  theme(legend.position = "bottom",
+        legend.title = element_blank())+
+  labs(title="Yearly Permitted Units", subtitle="Note: 2026 incomplete (January - August)")
+
+split_year_plot
 ```
 
 
