@@ -40,7 +40,7 @@ acs_vars <- tibble::tibble(
      "9a-Tenure by Bedrooms"
   ),
   variables = list(
-    paste0("DP05_00", sprintf("%02d", 5:17)),
+    paste0("DP05_00", sprintf("%02d", 4:17)),
     paste0("S2501_C01_0", sprintf("%02d", c(9:10, 14:15, 19, 23:24, 28))),
     "B25010_001",
     paste0("B25007_0", sprintf("%02d", c(1, 2, 12))),
@@ -56,6 +56,11 @@ acs_vars <- tibble::tibble(
 # Pull all variable-specific data
 results <- lapply(acs_vars$variables, get_acs_vars)
 names(results) <- acs_vars$table_name
+
+# Table DP05 has inconsistent variable names
+# -- We request the inclusive set for each year (IDs specified above)
+# -- Then rely on label to drop the variables we don't want
+results$`1c-Current Population by Age` <- dplyr::filter_out(grepl("(Median|ratio)", label))
 
 # This table must be requested whole because year_built variables differ by survey_year
 results$`8ab - Tenure by Year Built` <- get_acs_tbl(tn = "B25036") |>
