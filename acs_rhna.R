@@ -1,10 +1,11 @@
 # Retrieve published ACS data for the PSRC Regional Housing Needs Assessment
-# -- code uses psrccensus, tibble, openxlsx libraries 
+library(psrccensus)
+library(magrittr)
 
 survey_years <- c(2014, 2019, 2024)
 
 get_acs_tbl <- function(tn){
-  rs <- get_acs_recs(
+  rs <- psrccensus::get_acs_recs(
     table.names = tn,
     geography = "county", 
     years = survey_years, 
@@ -12,7 +13,7 @@ get_acs_tbl <- function(tn){
 }
 
 get_acs_vars <- function(v){
-  rs <- get_acs_recs(
+  rs <- psrccensus::get_acs_recs(
     variables = v,
     geography = "county", 
     years = survey_years, 
@@ -28,8 +29,8 @@ write_rhna_acs <- function(result_list){
 
 acs_vars <- tibble::tibble(
   table_name = c(
-     "1c-Current Population by Age",
-     "2ab HH Type",
+     "1c-Population by Age",
+     "2ab-HH Type",
      "3ab-Average HH Size",
      "4ab-Housing Tenure",
      "4c-Housing Tenure by Age",
@@ -60,10 +61,10 @@ names(results) <- acs_vars$table_name
 # Table DP05 has inconsistent variable names
 # -- We request the inclusive set for each year (IDs specified above)
 # -- Then rely on label to drop the variables we don't want
-results$`1c-Current Population by Age` <- dplyr::filter_out(grepl("(Median|ratio)", label))
+results$`1c-Population by Age` %<>% dplyr::filter_out(grepl("(Median|ratio)", label))
 
 # This table must be requested whole because year_built variables differ by survey_year
-results$`8ab - Tenure by Year Built` <- get_acs_tbl(tn = "B25036") |>
+results$`8ab-Tenure by Year Built` <- get_acs_tbl(tn = "B25036") %>%
   dplyr::filter_out(variable %in% paste0("B25036", sprintf("%02d", c(1, 2, 13))))
 
 write_rhna_acs(results)
