@@ -30,7 +30,7 @@ write_rhna_acs <- function(result_list){
 acs_vars <- tibble::tibble(
   table_name = c(
      "1c-Population by Age",
-     "2ab-HH Type",
+     "2b-HH Type",
      "3ab-Average HH Size",
      "4ab-Housing Tenure",
      "4c-Housing Tenure by Age",
