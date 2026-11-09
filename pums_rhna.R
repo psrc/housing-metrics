@@ -8,6 +8,12 @@ dir = "C:/projects/Census/AmericanCommunitySurvey/Data/PUMS/pums_rds"
 # 1. Setup: List necessary direct-PUMS variables & table names ------
 # PUMS variables for population-scale analysis
 
+pvars <- c(
+  "AGEP",                   # Age
+  "PRACE",                  # Respondent race (PSRC categories)
+  "HRACE"                   # Household race (PSRC categories)
+)
+
 hvars <- c(
   "AGEP",                   # Householder age
   "HINCP",                  # Household income
@@ -71,10 +77,10 @@ add_hh_vars <- function(so, ami) {
 }
 
 # Function for county + region counts
-ctyreg_pums_count <- function(so, group_vars=NULL) 
+ctyreg_pums_count <- function(so, group_vars=NULL) {
   rs      <- list()
-  rs[[1]] <- psrc_pums_count(so, group_vars=group_vars, incl_na=FALSE) 
-  rs[[2]] <- psrc_pums_count(so, group_vars=c("COUNTY", group_vars), incl_na=FALSE) %>%
+  rs[[1]] <- psrc_pums_count(so, group_vars=group_vars, incl_na=FALSE, rr = TRUE) 
+  rs[[2]] <- psrc_pums_count(so, group_vars=c("COUNTY", group_vars), incl_na=FALSE, rr = TRUE) %>%
     filter(COUNTY!="Region")
   rs %<>% data.table::rbindlist() %>% arrange(DATA_YEAR, COUNTY)
   return(rs)
@@ -83,8 +89,8 @@ ctyreg_pums_count <- function(so, group_vars=NULL)
 # Function for county + region median
 ctyreg_pums_median <- function(so, stat_var, group_vars=NULL){
   rs      <- list()
-  rs[[1]] <- psrc_pums_median(so, stat_var, group_vars=group_vars, incl_na=FALSE)  
-  rs[[2]] <- psrc_pums_median(so, stat_var, group_vars=c("COUNTY", group_vars), incl_na=FALSE) %>%
+  rs[[1]] <- psrc_pums_median(so, stat_var, group_vars=group_vars, incl_na=FALSE, rr = TRUE)  
+  rs[[2]] <- psrc_pums_median(so, stat_var, group_vars=c("COUNTY", group_vars), incl_na=FALSE, rr = TRUE) %>%
     filter(COUNTY!="Region")
   rs %<>% data.table::rbindlist() %>% arrange(DATA_YEAR, COUNTY)
   return(rs)
@@ -93,8 +99,8 @@ ctyreg_pums_median <- function(so, stat_var, group_vars=NULL){
 # Function for county + region mean
 ctyreg_pums_mean <- function(so, stat_var, group_vars=NULL){
   rs      <- list()
-  rs[[1]] <- psrc_pums_mean(so, stat_var, group_vars=group_vars, incl_na=FALSE)  
-  rs[[2]] <- psrc_pums_mean(so, stat_var, group_vars=c("COUNTY", group_vars), incl_na=FALSE) %>%
+  rs[[1]] <- psrc_pums_mean(so, stat_var, group_vars=group_vars, incl_na=FALSE, rr = TRUE)  
+  rs[[2]] <- psrc_pums_mean(so, stat_var, group_vars=c("COUNTY", group_vars), incl_na=FALSE, rr = TRUE) %>%
     filter(COUNTY!="Region")
   rs %<>% data.table::rbindlist() %>% arrange(DATA_YEAR, COUNTY)
   return(rs)
@@ -107,7 +113,7 @@ write_rhna_pums <- function(result_list){
 
 # 3. Main -----------------------------------------------------------
 get_singleyear_results <- function(survey_year){
-  pp_so <- get_psrc_pums(5, dyear = survey_year, "p", "AGEP", dir = dir)
+  pp_so <- get_psrc_pums(5, dyear = survey_year, "p", pvars, dir = dir)
   hh_so <- get_psrc_pums(5, dyear = survey_year, "h", hvars, dir = dir) %>% bin_age()
 
   hh_so %<>% mutate(
@@ -127,9 +133,9 @@ get_singleyear_results <- function(survey_year){
   results$`3d-Avg HH size by Race P` <- ctyreg_pums_mean(hh_so, stat_var = "NP", group_vars = "PRACE")
   results$`3d-Avg HH size by Race H` <- ctyreg_pums_mean(hh_so, stat_var = "NP", group_vars = "HRACE")
   results$`3e-Avg HH size by %AMI`   <- ctyreg_pums_mean(hh_so, stat_var = "NP", group_vars = "share_ami")
-  results$`4d-Tenure by Race P`      <- ctyreg_pums_count(hh_so, group_vars = c("OWN_RENT", "PRACE"))
-  results$`4d-Tenure by Race H`      <- ctyreg_pums_count(hh_so, group_vars = c("OWN_RENT", "HRACE"))
-  results$`4e-Tenure by %AMI`        <- ctyreg_pums_count(hh_so, group_vars = c("OWN_RENT", "share_ami"))
+  results$`4d-Tenure by Race P`      <- ctyreg_pums_count(hh_so, group_vars = c("PRACE","OWN_RENT"))
+  results$`4d-Tenure by Race H`      <- ctyreg_pums_count(hh_so, group_vars = c("HRACE", "OWN_RENT"))
+  results$`4e-Tenure by %AMI`        <- ctyreg_pums_count(hh_so, group_vars = c("share_ami", "OWN_RENT"))
   results$`5a-Income`                <- ctyreg_pums_median(hh_so, stat_var = "HINCP")
   results$`5c-Income by Age`         <- ctyreg_pums_median(hh_so, stat_var = "HINCP", group_vars = "age_bin5")
   results$`5e-Income by Race P`      <- ctyreg_pums_median(hh_so, stat_var = "HINCP", group_vars = "PRACE")
