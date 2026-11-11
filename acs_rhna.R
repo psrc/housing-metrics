@@ -42,7 +42,7 @@ acs_vars <- tibble::tibble(
   ),
   variables = list(
     paste0("DP05_00", sprintf("%02d", 4:17)),
-    paste0("S2501_C01_0", sprintf("%02d", c(9:10, 14:15, 19, 23:24, 28))),
+    paste0("S2501_C01_0", sprintf("%02d", c(1, 9:10, 14:15, 19, 23:24, 28))),
     "B25010_001",
     paste0("B25007_0", sprintf("%02d", c(1, 2, 12))),
     paste0("B25007_0", sprintf("%02d", setdiff(3:21, 12))),
@@ -62,6 +62,31 @@ names(results) <- acs_vars$table_name
 # -- We request the inclusive set for each year (IDs specified above)
 # -- Then rely on label to drop the variables we don't want
 results$`1c-Population by Age` %<>% dplyr::filter_out(grepl("(Median|ratio)", label))
+
+# Convert pre-2017 household-type percentages to approximate counts.
+# Scale uncertainty by the estimated total, treating that total as fixed.
+hh_type <- results$`2b-HH Type`
+occupied_totals <- hh_type %>%
+  dplyr::filter(year < 2017, variable == "S2501_C01_001") %>%
+  dplyr::transmute(GEOID, year, occupied_total = estimate)
+
+if (anyDuplicated(occupied_totals[c("GEOID", "year")])) {
+  stop("Duplicate occupied housing unit totals for a GEOID and year")
+}
+
+hh_type <- hh_type %>%
+  dplyr::left_join(occupied_totals, by = c("GEOID", "year"))
+convert_hh_type <- hh_type$year < 2017 & hh_type$variable != "S2501_C01_001"
+if (any(is.na(hh_type$occupied_total[convert_hh_type]))) {
+  stop("Missing occupied housing unit total for a pre-2017 household-type record")
+}
+hh_type$estimate[convert_hh_type] <-
+  hh_type$estimate[convert_hh_type] / 100 * hh_type$occupied_total[convert_hh_type]
+hh_type$moe[convert_hh_type] <-
+  hh_type$moe[convert_hh_type] / 100 * hh_type$occupied_total[convert_hh_type]
+hh_type$se[convert_hh_type] <-
+  hh_type$se[convert_hh_type] / 100 * hh_type$occupied_total[convert_hh_type]
+results$`2b-HH Type` <- dplyr::select(hh_type, -occupied_total)
 
 # This table must be requested whole because year_built variables differ by survey_year
 results$`8ab-Tenure by Year Built` <- get_acs_tbl(tn = "B25036") %>%
