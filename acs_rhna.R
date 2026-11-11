@@ -88,6 +88,33 @@ hh_type$se[convert_hh_type] <-
   hh_type$se[convert_hh_type] / 100 * hh_type$occupied_total[convert_hh_type]
 results$`2b-HH Type` <- dplyr::select(hh_type, -occupied_total)
 
+# Rebuild regional counts from the converted county estimates, not summed percentages.
+hh_type <- results$`2b-HH Type`
+hh_type_variables <- paste0("S2501_C01_0", sprintf("%02d", c(9:10, 14:15, 19, 23:24, 28)))
+county_geoids <- c("53033", "53035", "53053", "53061")
+region_rows <- which(hh_type$year < 2017 & toupper(hh_type$GEOID) == "REGION" &
+                       hh_type$variable %in% hh_type_variables)
+
+if (anyDuplicated(hh_type[region_rows, c("year", "variable")])) {
+  stop("Duplicate pre-2017 regional household-type records")
+}
+
+for (i in region_rows) {
+  counties <- hh_type %>%
+    dplyr::filter(year == hh_type$year[i], variable == hh_type$variable[i],
+                  GEOID %in% county_geoids)
+  if (nrow(counties) != length(county_geoids) ||
+      !setequal(counties$GEOID, county_geoids)) {
+    stop(sprintf("Expected one record for each county for year %s and variable %s",
+                 hh_type$year[i], hh_type$variable[i]))
+  }
+  hh_type$estimate[i] <- sum(counties$estimate)
+  hh_type$moe[i] <- tidycensus::moe_sum(counties$moe, estimate = counties$estimate)
+}
+
+hh_type[region_rows, ] <- psrccensus::reliability_calcs(hh_type[region_rows, ])
+results$`2b-HH Type` <- hh_type
+
 # This table must be requested whole because year_built variables differ by survey_year
 results$`8ab-Tenure by Year Built` <- get_acs_tbl(tn = "B25036") %>%
   dplyr::filter_out(variable %in% paste0("B25036", sprintf("%02d", c(1, 2, 13))))
